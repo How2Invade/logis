@@ -67,9 +67,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className="flex flex-col bg-background border-r border-border shrink-0 z-50 w-[200px]">
         {/* Logo */}
         <div className="flex items-center gap-3 px-5 h-[56px] shrink-0 border-b border-border">
-          <div className="w-6 h-6 rounded bg-dark-action flex items-center justify-center shrink-0">
-            <Activity className="w-3.5 h-3.5 text-dark-action-fg" />
-          </div>
+          <img src="/logo.png" alt="LOGIS Logo" className="w-12 h-12 shrink-0 scale-[1.7] -ml-1 object-contain" />
           <span className="font-bold text-[14px] tracking-widest whitespace-nowrap">
             LOGIS
           </span>

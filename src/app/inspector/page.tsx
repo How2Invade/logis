@@ -58,9 +58,7 @@ export default function InspectorPage() {
       {/* Header */}
       <header className="h-14 border-b border-border flex items-center px-6 gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-6 h-6 rounded bg-dark-action flex items-center justify-center">
-            <Activity className="w-3.5 h-3.5 text-dark-action-fg" />
-          </div>
+          <img src="/logo.png" alt="LOGIS Logo" className="w-12 h-12 shrink-0 scale-[1.7] -ml-2 object-contain" />
           <span className="font-bold text-[14px] tracking-widest">LOGIS</span>
           <span className="text-xs text-muted-foreground">Quality Control Center</span>
         </div>

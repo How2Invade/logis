@@ -36,9 +36,8 @@ export default function EntryPage() {
         <div className="bg-surface border border-border rounded-2xl shadow-sm p-8">
           
           <div className="flex flex-col items-center mb-10">
-            {/* Orange Small Accent */}
-            <div className="w-12 h-12 rounded-xl bg-dark-action flex items-center justify-center mb-6 shadow-sm ring-4 ring-primary/10">
-              <Activity className="w-6 h-6 text-dark-action-fg" />
+            <div className="w-32 h-32 mb-4 scale-[1.7] flex items-center justify-center">
+              <img src="/logo.png" alt="LOGIS Logo" className="w-full h-full object-contain" />
             </div>
             
             <h1 className="text-3xl font-bold tracking-tight text-foreground mb-2">
