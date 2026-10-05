@@ -40,27 +40,27 @@ export function formatTimeAgo(d: string): string {
 }
 
 export const severityColors: Record<string, string> = {
-  critical: 'bg-red-500/15 text-red-400 border-red-500/30',
-  high: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
-  medium: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
-  low: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
+  critical: 'bg-critical/10 text-critical border-critical/20',
+  high: 'bg-primary/10 text-primary border-primary/20',
+  medium: 'bg-warning/10 text-warning border-warning/20',
+  low: 'bg-foreground/10 text-foreground border-border',
 };
 
 export const statusColors: Record<string, string> = {
-  source: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
-  affected: 'bg-red-500/15 text-red-400 border-red-500/30',
-  uncertain: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-  safe: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-  sold: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
-  unaccounted: 'bg-orange-500/15 text-orange-400 border-orange-500/30',
-  not_relevant: 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30',
+  source: 'bg-critical/10 text-critical border-critical/20',
+  affected: 'bg-critical/10 text-critical border-critical/20',
+  uncertain: 'bg-warning/10 text-warning border-warning/20',
+  safe: 'bg-success/10 text-success border-success/20',
+  sold: 'bg-muted/10 text-muted-foreground border-border',
+  unaccounted: 'bg-primary/10 text-primary border-primary/20',
+  not_relevant: 'bg-surface-2 text-muted border-border',
 };
 
 export const incidentStatusColors: Record<string, string> = {
-  pending: 'bg-yellow-500/15 text-yellow-400',
-  analyzing: 'bg-blue-500/15 text-blue-400',
-  analyzed: 'bg-cyan-500/15 text-cyan-400',
-  responding: 'bg-orange-500/15 text-orange-400',
-  recovering: 'bg-purple-500/15 text-purple-400',
-  resolved: 'bg-emerald-500/15 text-emerald-400',
+  pending: 'bg-warning/10 text-warning border border-warning/20',
+  analyzing: 'bg-primary/10 text-primary border border-primary/20',
+  analyzed: 'bg-primary/10 text-primary border border-primary/20',
+  responding: 'bg-primary/10 text-primary border border-primary/20',
+  recovering: 'bg-primary/10 text-primary border border-primary/20',
+  resolved: 'bg-success/10 text-success border border-success/20',
 };

@@ -278,6 +278,15 @@ export interface ImpactResult {
   nodes: GraphNode[];
   edges: GraphEdge[];
   estimatedImpactINR: number;
+  facilityBreakdown?: FacilityImpact[];
+}
+
+export interface FacilityImpact {
+  id: string;
+  name: string;
+  affected: number;
+  safe: number;
+  uncertain: number;
 }
 
 export interface ResponseAction {

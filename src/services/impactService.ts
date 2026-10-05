@@ -60,6 +60,10 @@ export function computeImpact(input: ImpactInput): ImpactResult {
   const affectedStoreSet = new Set<string>();
   const affectedWarehouseSet = new Set<string>();
   const lines: ImpactLine[] = [];
+  const facilityMap = new Map<string, { id: string; name: string; affected: number; safe: number; uncertain: number }>();
+  for (const w of input.warehouses) {
+    facilityMap.set(w.id, { id: w.id, name: w.name, affected: 0, safe: 0, uncertain: 0 });
+  }
 
   // Find affected batches
   const affectedBatches = new Map<string, { status: ClassificationStatus; path: string[]; reason: string; fractionUsed: number }>();
@@ -89,12 +93,15 @@ export function computeImpact(input: ImpactInput): ImpactResult {
         ? input.warehouses.find(w => w.id === inv.locationId)?.name || inv.locationId
         : input.stores.find(s => s.id === inv.locationId)?.name || inv.locationId;
 
+      const fac = inv.locationType === 'warehouse' ? facilityMap.get(inv.locationId) : undefined;
       if (batchInfo.status === 'affected') {
         affectedUnits += impactedQty;
         if (safeQty > 0) safeUnits += safeQty;
+        if (fac) { fac.affected += impactedQty; if (safeQty > 0) fac.safe += safeQty; }
       } else if (batchInfo.status === 'uncertain') {
         uncertainUnits += impactedQty;
         if (safeQty > 0) safeUnits += safeQty;
+        if (fac) { fac.uncertain += impactedQty; if (safeQty > 0) fac.safe += safeQty; }
       }
 
       affectedLocations.add(inv.locationId);
@@ -151,6 +158,10 @@ export function computeImpact(input: ImpactInput): ImpactResult {
     const batchInventory = input.inventory.filter(inv => inv.batchId === batchId);
     for (const inv of batchInventory) {
       safeUnits += inv.quantity;
+      if (inv.locationType === 'warehouse') {
+        const fac = facilityMap.get(inv.locationId);
+        if (fac) fac.safe += inv.quantity;
+      }
     }
   }
 
@@ -210,5 +221,6 @@ export function computeImpact(input: ImpactInput): ImpactResult {
     nodes: graphNodes,
     edges: graphEdges,
     estimatedImpactINR,
+    facilityBreakdown: Array.from(facilityMap.values()),
   };
 }

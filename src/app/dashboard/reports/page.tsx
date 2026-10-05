@@ -3,11 +3,15 @@
 import { useEffect, useState } from 'react';
 import { 
   BarChart3, FileText, Download, Printer, Filter, 
-  AlertTriangle, CheckCircle2, Clock, Calendar, Box, Activity 
+  AlertTriangle, CheckCircle2, Clock, Calendar, Box, Activity, FileJson
 } from 'lucide-react';
 import { cn, formatCurrency, formatNumber } from '@/lib/utils';
 import type { Incident } from '@/lib/types';
 import { toast } from 'sonner';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { buildReportData, toReportJSON, reportFileBase, downloadFile } from '@/lib/report/data';
+import { generateLogisPDF } from '@/lib/report/pdf';
+import { buildReportText } from '@/lib/report/text';
 
 export default function ReportsPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -15,6 +19,9 @@ export default function ReportsPage() {
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [reportType, setReportType] = useState<'comprehensive' | 'impact' | 'recovery'>('comprehensive');
   const [isExporting, setIsExporting] = useState(false);
+  const [impact, setImpact] = useState<any>(null);
+  const [responseStats, setResponseStats] = useState<any>(null);
+  const [impactLoading, setImpactLoading] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -34,51 +41,84 @@ export default function ReportsPage() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    async function fetchDetails() {
+      if (!selectedIncidentId) return;
+      setImpactLoading(true);
+      try {
+        const [impRes, rspRes] = await Promise.all([
+          fetch(`/api/incidents/${selectedIncidentId}/analyze`, { method: 'POST' }),
+          fetch(`/api/incidents/${selectedIncidentId}/response`, { method: 'POST' })
+        ]);
+        const impData = await impRes.json();
+        const rspData = await rspRes.json();
+        setImpact(impData.data);
+        if (rspData.data) {
+          setResponseStats(rspData.data.comparison);
+        }
+      } catch (e) {
+        console.error('Failed to fetch details', e);
+      } finally {
+        setImpactLoading(false);
+      }
+    }
+    fetchDetails();
+  }, [selectedIncidentId]);
+
   const handlePrint = () => {
     window.print();
     toast.success('Preparing document for printing');
   };
 
+  const generateData = async () => {
+    if (!selectedIncidentId || !selectedIncident) throw new Error('No incident selected');
+    return await buildReportData(selectedIncidentId);
+  };
+
   const handleExport = async () => {
     if (!selectedIncidentId) return;
     setIsExporting(true);
-    toast.loading('Generating PDF...', { id: 'pdf-export' });
+    toast.loading('Generating PDF...', { id: 'export' });
     
     try {
-      const element = document.getElementById('report-content');
-      if (!element) throw new Error('Report content not found');
-      
-      // Dynamically import to avoid Next.js SSR issues and module resolution problems
-      const html2canvasModule = await import('html2canvas');
-      const html2canvas = html2canvasModule.default ? html2canvasModule.default : html2canvasModule;
-      
-      const jsPDFModule = await import('jspdf');
-      const jsPDF = jsPDFModule.default ? jsPDFModule.default : jsPDFModule.jsPDF || jsPDFModule;
-      
-      const canvas = await (html2canvas as any)(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new (jsPDF as any)({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`LOGIS-Report-${selectedIncidentId}.pdf`);
-      
-      toast.success('Report downloaded successfully!', { id: 'pdf-export' });
+      const data = await generateData();
+      await generateLogisPDF(data, `${reportFileBase(data)}.pdf`);
+      toast.success('Report downloaded successfully!', { id: 'export' });
     } catch (error: any) {
       console.error('Failed to export PDF:', error);
-      toast.error(`Failed to generate PDF: ${error.message || 'Unknown error'}`, { id: 'pdf-export' });
+      toast.error(`Failed to generate PDF: ${error.message || 'Unknown error'}`, { id: 'export' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportJSON = async () => {
+    if (!selectedIncidentId) return;
+    setIsExporting(true);
+    toast.loading('Generating JSON...', { id: 'export' });
+    try {
+      const data = await generateData();
+      const content = JSON.stringify(toReportJSON(data), null, 2);
+      downloadFile(content, `${reportFileBase(data)}.json`, 'application/json');
+      toast.success('JSON downloaded successfully!', { id: 'export' });
+    } catch (error: any) {
+      toast.error('Failed to generate JSON', { id: 'export' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportTXT = async () => {
+    if (!selectedIncidentId) return;
+    setIsExporting(true);
+    toast.loading('Generating TXT...', { id: 'export' });
+    try {
+      const data = await generateData();
+      const content = buildReportText(data);
+      downloadFile(content, `${reportFileBase(data)}.txt`, 'text/plain');
+      toast.success('TXT downloaded successfully!', { id: 'export' });
+    } catch (error: any) {
+      toast.error('Failed to generate TXT', { id: 'export' });
     } finally {
       setIsExporting(false);
     }
@@ -86,89 +126,97 @@ export default function ReportsPage() {
 
   const selectedIncident = incidents.find(i => i.id === selectedIncidentId);
 
+  // Mock data for charts
+  const facilityData = [
+    { name: 'WH-001', affected: 1200, safe: 8400 },
+    { name: 'WH-002', affected: 450, safe: 3200 },
+    { name: 'ST-042', affected: 340, safe: 120 },
+    { name: 'ST-019', affected: 210, safe: 450 },
+  ];
+
+  const productData = [
+    { name: 'Product A', value: 4500, color: 'var(--color-critical)' },
+    { name: 'Product B', value: 2100, color: 'var(--color-warning)' },
+    { name: 'Product C', value: 1375, color: 'var(--color-orange)' },
+  ];
+
+  const costData = responseStats ? [
+    { name: 'Naive Approach', cost: responseStats.naive.totalCost },
+    { name: 'LOGIS Response', cost: responseStats.logis.totalCost }
+  ] : [];
+
   if (loading) {
     return (
-      <div className="p-12 space-y-10 max-w-[1600px] mx-auto min-h-screen">
-        <div className="skeleton h-12 w-64 rounded-xl" />
-        <div className="skeleton h-[600px] rounded-3xl" />
+      <div className="px-8 lg:px-10 py-7 space-y-10 max-w-[1400px] mx-auto min-h-screen">
+        <div className="skeleton w-12 h-12 rounded-full mx-auto mt-20 animate-pulse" />
       </div>
     );
   }
 
   return (
-    <div className="p-8 lg:p-12 space-y-12 max-w-[1800px] mx-auto min-h-screen bg-background">
-      {/* Header */}
+    <div className="px-8 lg:px-10 py-7 max-w-[1400px] mx-auto min-h-screen bg-background text-foreground transition-colors duration-300">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 print:hidden">
         <div>
-          <h1 className="text-4xl lg:text-5xl font-black tracking-tight text-foreground">Reporting & Analytics</h1>
-          <p className="text-lg text-muted-foreground mt-3 font-medium">
-            Generate, view, and export operational intelligence reports
-          </p>
+          <h1 className="text-[32px] font-semibold text-foreground mb-1">Reports & Analytics</h1>
+          <p className="text-[14px] text-muted-foreground">Generate, view, and export operational intelligence reports</p>
         </div>
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={handlePrint}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl border-2 border-border/50 bg-surface text-foreground font-bold hover:bg-surface-2 transition-all shadow-sm"
-          >
-            <Printer className="w-5 h-5" />
-            Print
+        <div className="flex flex-wrap items-center gap-4">
+          <button onClick={handleExportTXT} className="flex items-center gap-2 px-6 py-2.5 rounded-full border border-border bg-surface text-foreground text-[14px] font-semibold hover:bg-surface-2 transition-all shadow-sm">
+            <FileText className="w-4 h-4" /> Export TXT
           </button>
-          <button 
-            onClick={handleExport}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg"
-          >
-            <Download className="w-5 h-5" />
-            Export PDF
+          <button onClick={handleExportJSON} className="flex items-center gap-2 px-6 py-2.5 rounded-full border border-border bg-surface text-foreground text-[14px] font-semibold hover:bg-surface-2 transition-all shadow-sm">
+            <FileJson className="w-4 h-4" /> Export JSON
+          </button>
+          <button onClick={handleExport} className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-dark-action text-dark-action-fg text-[14px] font-semibold hover:opacity-90 transition-all shadow-sm">
+            <Download className="w-4 h-4" /> Export PDF
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-10 print:block">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 print:block mt-8">
         
-        {/* Sidebar Controls (Hidden on Print) */}
-        <div className="xl:col-span-1 space-y-8 print:hidden">
-          <div className="rounded-2xl border-2 border-border/50 bg-surface p-6 shadow-md space-y-6">
-            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-              <Filter className="w-4 h-4" />
-              Report Configuration
+        {/* Sidebar Controls */}
+        <div className="xl:col-span-1 space-y-6 print:hidden">
+          <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm space-y-6">
+            <h3 className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+              <Filter className="w-4 h-4" /> Report Configuration
             </h3>
             
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Select Incident</label>
-                <select 
-                  className="w-full bg-surface-2 border border-border/50 rounded-xl p-3 text-sm font-semibold outline-none focus:border-primary/50 transition-colors"
-                  value={selectedIncidentId || ''}
-                  onChange={(e) => setSelectedIncidentId(e.target.value)}
-                >
-                  {incidents.map(inc => (
-                    <option key={inc.id} value={inc.id}>{inc.id} - {inc.title}</option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="text-[12px] font-medium text-foreground block mb-2">Target Incident</label>
+              <select 
+                value={selectedIncidentId || ''} 
+                onChange={(e) => setSelectedIncidentId(e.target.value)}
+                className="w-full bg-surface-2 border border-border text-[13px] rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-foreground/20 transition-all"
+              >
+                {incidents.map(inc => (
+                  <option key={inc.id} value={inc.id}>{inc.id} — {inc.title}</option>
+                ))}
+              </select>
+            </div>
 
-              <div>
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 block">Report Type</label>
-                <div className="space-y-2">
-                  {[
-                    { id: 'comprehensive', label: 'Comprehensive Overview' },
-                    { id: 'impact', label: 'Impact & Financial Analysis' },
-                    { id: 'recovery', label: 'Recovery & Logistics Plan' }
-                  ].map(type => (
-                    <button
-                      key={type.id}
-                      onClick={() => setReportType(type.id as any)}
-                      className={cn(
-                        "w-full text-left px-4 py-3 rounded-xl border-2 transition-all text-sm font-bold",
-                        reportType === type.id 
-                          ? "border-primary bg-primary/5 text-primary" 
-                          : "border-border/40 bg-surface hover:bg-surface-2 hover:border-border"
-                      )}
-                    >
+            <div>
+              <label className="text-[12px] font-medium text-foreground block mb-2">Report Type</label>
+              <div className="space-y-2">
+                {[
+                  { id: 'comprehensive', label: 'Comprehensive Summary' },
+                  { id: 'impact', label: 'Impact & Spread Analysis' },
+                  { id: 'recovery', label: 'Recovery & Logistics' }
+                ].map(type => (
+                  <label key={type.id} className="flex items-center gap-3 cursor-pointer group">
+                    <input 
+                      type="radio" name="reportType" className="peer sr-only" 
+                      checked={reportType === type.id} 
+                      onChange={() => setReportType(type.id as any)} 
+                    />
+                    <div className="w-4 h-4 rounded-full border border-border flex items-center justify-center bg-surface peer-checked:border-dark-action peer-checked:bg-dark-action transition-all">
+                      <div className="w-1.5 h-1.5 rounded-full bg-white opacity-0 peer-checked:opacity-100" />
+                    </div>
+                    <span className="text-[13px] text-muted-foreground group-hover:text-foreground font-medium transition-colors">
                       {type.label}
-                    </button>
-                  ))}
-                </div>
+                    </span>
+                  </label>
+                ))}
               </div>
             </div>
           </div>
@@ -176,118 +224,171 @@ export default function ReportsPage() {
 
         {/* Report Preview */}
         <div className="xl:col-span-3">
-          {selectedIncident ? (
-            <div id="report-content" className="rounded-3xl border border-border bg-surface p-10 lg:p-16 shadow-2xl print:shadow-none print:border-none print:p-0">
-              
-              {/* Report Header */}
-              <div className="border-b-2 border-border/50 pb-10 mb-10 flex items-start justify-between">
-                <div className="space-y-4">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-primary/10 text-primary font-bold text-sm tracking-widest uppercase">
-                    <FileText className="w-4 h-4" />
-                    {reportType === 'comprehensive' ? 'Comprehensive Report' : reportType === 'impact' ? 'Impact Report' : 'Recovery Report'}
-                  </div>
-                  <h2 className="text-3xl font-black text-foreground">{selectedIncident.title}</h2>
-                  <p className="text-lg text-muted-foreground max-w-3xl leading-relaxed">{selectedIncident.description}</p>
+          <div id="report-content" className="rounded-2xl border border-border bg-surface shadow-sm overflow-hidden min-h-[800px]">
+            
+            {/* Report Header */}
+            <div className="p-8 md:p-12 border-b border-border bg-surface-2/30">
+              <div className="flex justify-between items-start mb-12">
+                <div>
+                  <div className="text-[24px] font-bold tracking-tight text-foreground mb-1">LOGIS Intelligence Report</div>
+                  <div className="text-[14px] text-muted-foreground font-medium uppercase tracking-widest">{reportType} Analysis</div>
                 </div>
-                <div className="text-right space-y-1">
-                  <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Report ID</div>
-                  <div className="font-mono font-bold text-foreground">REP-{selectedIncident.id}-{Date.now().toString().slice(-4)}</div>
-                  <div className="text-sm font-bold text-muted-foreground uppercase tracking-wider mt-4">Generated On</div>
-                  <div className="font-medium text-foreground">{new Date().toLocaleDateString('en-US', { dateStyle: 'full' })}</div>
+                <div className="text-right text-[12px] text-muted-foreground">
+                  <div>Generated: {new Date().toLocaleString()}</div>
+                  <div>ID: REP-{Math.random().toString(36).substring(2, 8).toUpperCase()}</div>
                 </div>
               </div>
 
-              {/* Report Metrics */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-12">
-                <MetricCard title="Incident ID" value={selectedIncident.id} icon={AlertTriangle} />
-                <MetricCard title="Severity" value={selectedIncident.severity.toUpperCase()} color={selectedIncident.severity === 'critical' ? 'red' : 'orange'} />
-                <MetricCard title="Status" value={selectedIncident.status.toUpperCase()} />
-                <MetricCard title="Source Lot" value={selectedIncident.sourceLot} icon={Box} />
-              </div>
-
-              {/* Report Content Blocks */}
-              <div className="space-y-12">
-                
-                {/* Timeline / Overview */}
-                <section>
-                  <h3 className="text-xl font-black border-b-2 border-border/50 pb-3 mb-6 flex items-center gap-3">
-                    <Clock className="w-6 h-6 text-muted-foreground" />
-                    Event Timeline
-                  </h3>
-                  <div className="space-y-6">
-                    <div className="flex gap-4 p-5 rounded-2xl bg-surface-2 border border-border/50">
-                      <div className="w-12 h-12 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center shrink-0">
-                        <AlertTriangle className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-foreground">Incident Detected</h4>
-                        <p className="text-sm text-muted-foreground mt-1">Initial anomaly detected in {selectedIncident.location}. System automatically flagged Lot {selectedIncident.sourceLot} for review.</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-4 p-5 rounded-2xl bg-surface-2 border border-border/50">
-                      <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-500 flex items-center justify-center shrink-0">
-                        <Activity className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-foreground">Impact Analysis Completed</h4>
-                        <p className="text-sm text-muted-foreground mt-1">Graph traversal executed across supply chain network. Upstream and downstream dependencies mapped.</p>
-                      </div>
-                    </div>
+              {selectedIncident && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  <div>
+                    <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Incident</div>
+                    <div className="text-[15px] font-semibold text-foreground">{selectedIncident.id}</div>
                   </div>
-                </section>
-
-                {/* Simulated Data Block for Demo */}
-                <section>
-                  <h3 className="text-xl font-black border-b-2 border-border/50 pb-3 mb-6 flex items-center gap-3">
-                    <BarChart3 className="w-6 h-6 text-muted-foreground" />
-                    Key Findings & Metrics
-                  </h3>
-                  <div className="bg-surface-2/50 rounded-2xl p-8 border border-border/50 text-center">
-                    <p className="text-muted-foreground mb-4">Detailed analytical charts are rendered here based on graph traversal data.</p>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                       <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
-                         <div className="text-4xl font-black text-foreground mb-2">342</div>
-                         <div className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Units at Risk</div>
-                       </div>
-                       <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
-                         <div className="text-4xl font-black text-foreground mb-2">4</div>
-                         <div className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Facilities Affected</div>
-                       </div>
-                       <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
-                         <div className="text-4xl font-black text-foreground mb-2">{formatCurrency(1250000)}</div>
-                         <div className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Est. Exposure</div>
-                       </div>
-                    </div>
+                  <div>
+                    <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Severity</div>
+                    <div className="text-[15px] font-semibold text-critical capitalize">{selectedIncident.severity}</div>
                   </div>
-                </section>
+                  <div>
+                    <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Source Lot</div>
+                    <div className="text-[15px] font-semibold text-foreground">{selectedIncident.sourceLot}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Status</div>
+                    <div className="text-[15px] font-semibold text-warning capitalize">{selectedIncident.status}</div>
+                  </div>
+                </div>
+              )}
+            </div>
 
-              </div>
+            {/* Report Body */}
+            <div className="p-8 md:p-12 space-y-12 bg-surface">
               
-              <div className="mt-20 pt-8 border-t border-border/50 text-center text-sm font-medium text-muted-foreground">
-                CONFIDENTIAL — LOGIS OPERATIONAL INTELLIGENCE REPORT
-              </div>
+              {impactLoading ? (
+                <div className="text-center py-20 text-muted-foreground text-[14px]">Generating analytics...</div>
+              ) : impact ? (
+                <>
+                  {/* Executive Summary */}
+                  <div>
+                    <h2 className="text-[16px] font-semibold border-b border-border pb-2 mb-6">1. Executive Summary</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-4 rounded-xl border border-border bg-surface-2/50">
+                        <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Affected Units</div>
+                        <div className="text-2xl font-bold text-critical tabular-nums">{formatNumber(impact.affectedUnits)}</div>
+                      </div>
+                      <div className="p-4 rounded-xl border border-border bg-surface-2/50">
+                        <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Safe Units</div>
+                        <div className="text-2xl font-bold text-success tabular-nums">{formatNumber(impact.safeUnits)}</div>
+                      </div>
+                      <div className="p-4 rounded-xl border border-border bg-surface-2/50">
+                        <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Uncertain Units</div>
+                        <div className="text-2xl font-bold text-warning tabular-nums">{formatNumber(impact.uncertainUnits)}</div>
+                      </div>
+                      <div className="p-4 rounded-xl border border-border bg-surface-2/50">
+                        <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Est. Financial Impact</div>
+                        <div className="text-2xl font-bold text-foreground tabular-nums">{formatCurrency(impact.estimatedImpactINR)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Impact by Facility & Product */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                    <div>
+                      <h2 className="text-[16px] font-semibold border-b border-border pb-2 mb-6">2. Impact by Facility</h2>
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={facilityData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+                            <XAxis dataKey="name" tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                            <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '8px' }} itemStyle={{ color: 'var(--color-foreground)' }} />
+                            <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', color: 'var(--color-muted-foreground)' }} />
+                            <Bar dataKey="affected" name="Affected" stackId="a" fill="var(--color-critical)" barSize={24} />
+                            <Bar dataKey="safe" name="Safe" stackId="a" fill="var(--color-success)" barSize={24} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h2 className="text-[16px] font-semibold border-b border-border pb-2 mb-6">3. Affected Units by Product</h2>
+                      <div className="h-64 flex items-center justify-center">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={productData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value" stroke="none">
+                              {productData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                            </Pie>
+                            <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '8px' }} />
+                            <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', color: 'var(--color-muted-foreground)' }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Response Cost Comparison */}
+                  {responseStats && (
+                    <div>
+                      <h2 className="text-[16px] font-semibold border-b border-border pb-2 mb-6">4. Response Cost Comparison</h2>
+                      <div className="h-64 max-w-lg">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={costData} layout="vertical" margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="var(--color-border)" />
+                            <XAxis type="number" tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `₹${v/1000}k`} />
+                            <YAxis type="category" dataKey="name" tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                            <Tooltip formatter={(value: any) => formatCurrency(value)} contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '8px' }} />
+                            <Bar dataKey="cost" name="Estimated Cost" fill="var(--color-warning)" radius={[0, 4, 4, 0]} barSize={24}>
+                              {costData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={index === 1 ? 'var(--color-success)' : 'var(--color-border)'} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <p className="text-[13px] text-muted-foreground mt-4">
+                        LOGIS avoids {formatNumber(responseStats.unnecessaryRecallAvoided)} unnecessary product recalls, resulting in a net saving of {formatCurrency(responseStats.costSaved)}.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Operational Details Table */}
+                  <div className="print:break-before-page">
+                    <h2 className="text-[16px] font-semibold border-b border-border pb-2 mb-6">5. Critical Action Areas</h2>
+                    <table className="w-full text-left text-[13px]">
+                      <thead>
+                        <tr className="border-b border-border text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+                          <th className="pb-3 px-2">Location</th>
+                          <th className="pb-3 px-2">Status</th>
+                          <th className="pb-3 px-2 text-right">Affected Units</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        <tr className="bg-surface-2/30">
+                          <td className="py-3 px-2 font-medium">WH-001 (Central)</td>
+                          <td className="py-3 px-2"><span className="text-critical font-semibold">Critical Impact</span></td>
+                          <td className="py-3 px-2 text-right tabular-nums">1,200</td>
+                        </tr>
+                        <tr>
+                          <td className="py-3 px-2 font-medium">WH-002 (North)</td>
+                          <td className="py-3 px-2"><span className="text-critical font-semibold">Critical Impact</span></td>
+                          <td className="py-3 px-2 text-right tabular-nums">450</td>
+                        </tr>
+                        <tr className="bg-surface-2/30">
+                          <td className="py-3 px-2 font-medium">ST-042 (Metro)</td>
+                          <td className="py-3 px-2"><span className="text-warning font-semibold">Needs Verification</span></td>
+                          <td className="py-3 px-2 text-right tabular-nums">340</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                </>
+              ) : null}
+
             </div>
-          ) : (
-            <div className="rounded-3xl border-2 border-dashed border-border/50 bg-surface/50 h-[600px] flex items-center justify-center text-muted-foreground font-medium">
-              No incident selected
-            </div>
-          )}
+          </div>
         </div>
 
-      </div>
-    </div>
-  );
-}
-
-function MetricCard({ title, value, icon: Icon, color }: { title: string; value: string | React.ReactNode; icon?: any; color?: string }) {
-  return (
-    <div className="bg-surface-2 p-5 rounded-2xl border border-border/50">
-      <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
-        {Icon && <Icon className="w-4 h-4" />}
-        {title}
-      </div>
-      <div className={cn("text-xl font-black", color === 'red' ? 'text-red-500' : color === 'orange' ? 'text-orange-500' : 'text-foreground')}>
-        {value}
       </div>
     </div>
   );

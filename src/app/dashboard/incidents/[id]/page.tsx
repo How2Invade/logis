@@ -130,7 +130,7 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
       <div className="rounded-lg border border-border bg-surface p-6">
         <div className="flex items-start gap-4">
           <AlertTriangle className={cn('w-6 h-6 shrink-0 mt-0.5',
-            incident.severity === 'critical' ? 'text-red-400' : 'text-orange-400'
+            incident.severity === 'critical' ? 'text-critical' : 'text-warning'
           )} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-2">
@@ -172,10 +172,10 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
             <div key={event.id} className="flex items-start gap-3">
               <div className="relative">
                 <div className={cn('w-2 h-2 rounded-full mt-1.5',
-                  event.category === 'detection' ? 'bg-red-400' :
-                  event.category === 'analysis' ? 'bg-blue-400' :
-                  event.category === 'response' ? 'bg-amber-400' :
-                  event.category === 'recovery' ? 'bg-emerald-400' : 'bg-muted'
+                  event.category === 'detection' ? 'bg-critical' :
+                  event.category === 'analysis' ? 'bg-primary' :
+                  event.category === 'response' ? 'bg-warning' :
+                  event.category === 'recovery' ? 'bg-success' : 'bg-muted'
                 )} />
                 {i < timeline.length - 1 && (
                   <div className="absolute top-3.5 left-[3px] w-[2px] h-6 bg-border" />
@@ -229,9 +229,9 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
             {analysisSteps.map((step, i) => (
               <div key={i} className="flex items-center gap-3">
                 {i < currentStep ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
                 ) : i === currentStep ? (
-                  <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                  <Loader2 className="w-4 h-4 text-primary animate-spin shrink-0" />
                 ) : (
                   <div className="w-4 h-4 rounded-full border border-border shrink-0" />
                 )}
@@ -250,11 +250,11 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
           <div className="rounded-lg border border-border bg-surface p-5">
             <h3 className="text-sm font-medium mb-4">Impact Summary</h3>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <ImpactStat label="Affected" value={formatNumber(impact.affectedUnits)} color="text-red-400" />
-              <ImpactStat label="Safe" value={formatNumber(impact.safeUnits)} color="text-emerald-400" />
-              <ImpactStat label="Uncertain" value={formatNumber(impact.uncertainUnits)} color="text-amber-400" />
-              <ImpactStat label="Already Sold" value={formatNumber(impact.soldUnits)} color="text-purple-400" />
-              <ImpactStat label="Unaccounted" value={formatNumber(impact.unaccountedUnits)} color="text-orange-400" />
+              <ImpactStat label="Affected" value={formatNumber(impact.affectedUnits)} color="text-critical" />
+              <ImpactStat label="Safe" value={formatNumber(impact.safeUnits)} color="text-success" />
+              <ImpactStat label="Uncertain" value={formatNumber(impact.uncertainUnits)} color="text-warning" />
+              <ImpactStat label="Already Sold" value={formatNumber(impact.soldUnits)} color="text-muted-foreground" />
+              <ImpactStat label="Unaccounted" value={formatNumber(impact.unaccountedUnits)} color="text-primary" />
             </div>
           </div>
 
@@ -355,17 +355,17 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
             
             {/* Naive vs LOGIS */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div className="rounded-md border border-border p-4 bg-red-500/5">
+              <div className="rounded-md border border-border p-4 bg-critical/5">
                 <div className="text-xs text-muted-foreground mb-2">Naive Approach (Recall Everything)</div>
-                <div className="text-lg font-semibold text-red-400 tabular-nums">{formatNumber(response.comparison.naive.totalUnits)} units</div>
+                <div className="text-lg font-semibold text-critical tabular-nums">{formatNumber(response.comparison.naive.totalUnits)} units</div>
                 <div className="text-sm text-muted-foreground">{formatCurrency(response.comparison.naive.totalCost)} · {response.comparison.naive.estimatedTimeHours}h</div>
                 <div className="text-xs text-muted mt-1">SIMULATED</div>
               </div>
-              <div className="rounded-md border border-emerald-500/30 p-4 bg-emerald-500/5">
+              <div className="rounded-md border border-success/30 p-4 bg-success/5">
                 <div className="text-xs text-muted-foreground mb-2">LOGIS Response (Precise Targeting)</div>
-                <div className="text-lg font-semibold text-emerald-400 tabular-nums">{formatNumber(response.comparison.logis.totalUnits)} units</div>
+                <div className="text-lg font-semibold text-success tabular-nums">{formatNumber(response.comparison.logis.totalUnits)} units</div>
                 <div className="text-sm text-muted-foreground">{formatCurrency(response.comparison.logis.totalCost)} · {response.comparison.logis.estimatedTimeHours}h</div>
-                <div className="mt-2 text-xs text-emerald-400">
+                <div className="mt-2 text-xs text-success">
                   {formatNumber(response.comparison.unnecessaryRecallAvoided)} unnecessary recalls avoided · {formatCurrency(response.comparison.costSaved)} saved
                 </div>
                 <div className="text-xs text-muted mt-1">SIMULATED</div>
@@ -384,11 +384,11 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-sm font-medium">{action.description}</span>
                         <span className={cn('px-1.5 py-0.5 rounded text-[9px]',
-                          action.type === 'stop_shipment' ? 'bg-red-500/15 text-red-400' :
-                          action.type === 'quarantine' ? 'bg-orange-500/15 text-orange-400' :
-                          action.type === 'withdraw' ? 'bg-amber-500/15 text-amber-400' :
-                          action.type === 'recall' ? 'bg-purple-500/15 text-purple-400' :
-                          'bg-blue-500/15 text-blue-400'
+                          action.type === 'stop_shipment' ? 'bg-critical/10 text-critical' :
+                          action.type === 'quarantine' ? 'bg-primary/10 text-primary' :
+                          action.type === 'withdraw' ? 'bg-warning/10 text-warning' :
+                          action.type === 'recall' ? 'bg-muted/10 text-muted-foreground' :
+                          'bg-foreground/10 text-foreground'
                         )}>
                           {action.type.replace('_', ' ')}
                         </span>
@@ -416,10 +416,10 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
           
           {/* Idle Resources */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <ImpactStat label="Idle Machines" value={String(recovery.idleResources.filter(r => r.type === 'machine').length)} color="text-amber-400" />
-            <ImpactStat label="Available Workers" value={String(recovery.idleResources.filter(r => r.type === 'worker').length)} color="text-blue-400" />
-            <ImpactStat label="Free Warehouse Slots" value={formatNumber(recovery.idleResources.filter(r => r.type === 'warehouse_slot').reduce((s, r) => s + r.capacity, 0))} color="text-cyan-400" />
-            <ImpactStat label="Available Trucks" value={String(recovery.idleResources.filter(r => r.type === 'truck').length)} color="text-emerald-400" />
+            <ImpactStat label="Idle Machines" value={String(recovery.idleResources.filter(r => r.type === 'machine').length)} color="text-warning" />
+            <ImpactStat label="Available Workers" value={String(recovery.idleResources.filter(r => r.type === 'worker').length)} color="text-primary" />
+            <ImpactStat label="Free Warehouse Slots" value={formatNumber(recovery.idleResources.filter(r => r.type === 'warehouse_slot').reduce((s, r) => s + r.capacity, 0))} color="text-muted-foreground" />
+            <ImpactStat label="Available Trucks" value={String(recovery.idleResources.filter(r => r.type === 'truck').length)} color="text-success" />
           </div>
 
           {/* Demand Gaps */}
@@ -450,7 +450,7 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
               <h4 className="text-xs text-muted-foreground mb-3">Proposed Allocations</h4>
               <div className="space-y-2">
                 {recovery.allocations.map(a => (
-                  <div key={a.id} className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-4">
+                  <div key={a.id} className="rounded-md border border-success/20 bg-success/5 p-4">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-medium">{a.resourceName}</span>
                       <ChevronRight className="w-3 h-3 text-muted" />
@@ -480,7 +480,7 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
             </div>
             <div>
               <div className="text-xs text-muted-foreground mb-1">Potential Value</div>
-              <div className="text-lg font-semibold tabular-nums text-emerald-400">{formatCurrency(recovery.potentialRecoveryValue)}</div>
+              <div className="text-lg font-semibold tabular-nums text-success">{formatCurrency(recovery.potentialRecoveryValue)}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground mb-1">Idle Reduction</div>
@@ -489,7 +489,7 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
           </div>
           
           <div className="mt-3 text-xs text-muted flex items-center gap-2">
-            <span className="px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/30 text-[9px]">SIMULATED</span>
+            <span className="px-1.5 py-0.5 rounded bg-warning/10 text-warning border border-warning/20 font-bold uppercase tracking-widest text-[9px]">SIMULATED</span>
             Simulated demo comparison — values are derived from the synthetic operational network
           </div>
         </div>

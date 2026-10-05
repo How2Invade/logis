@@ -17,13 +17,12 @@
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-fg);
   
-  --color-red: #ef4444;
-  --color-amber: #f59e0b;
-  --color-emerald: #10b981;
-  --color-purple: #a855f7;
-  --color-cyan: #06b6d4;
-  --color-orange: #f97316;
-  --color-blue: #3b82f6;
+  --color-dark-action: var(--dark-action);
+  --color-dark-action-fg: var(--dark-action-fg);
+  
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-critical: var(--color-critical);
 
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
@@ -36,35 +35,54 @@
 }
 
 :root {
-  --bg: #f8fafc;
-  --fg: #0f172a;
-  --surface: #ffffff;
-  --surface-2: #f1f5f9;
-  --surface-3: #e2e8f0;
-  --border-color: #e2e8f0;
-  --border-subtle: #f1f5f9;
-  --muted: #94a3b8;
-  --muted-fg: #475569;
-  
-  --primary: #0f172a;
-  --primary-fg: #ffffff;
-  --radius: 0.5rem;
+  --bg: #F5F2EC;
+  --fg: #181818;
+  --surface: #FFFFFF;
+  --surface-2: #F8F6F1;
+  --border-color: #E5E1D9;
+  --muted: #99958E;
+  --muted-fg: #737373;
+  --primary: #F29B5B;
+  --primary-fg: #FFFFFF;
+  --dark-action: #202020;
+  --dark-action-fg: #FFFFFF;
+  --color-success: #4F8A68;
+  --color-warning: #C58A32;
+  --color-critical: #C85A52;
+  --radius: 1rem;
 }
 
 .dark {
-  --bg: #020817;
-  --fg: #f8fafc;
-  --surface: #0f172a;
-  --surface-2: #1e293b;
-  --surface-3: #334155;
-  --border-color: #1e293b;
-  --border-subtle: #0f172a;
-  --muted: #475569;
-  --muted-fg: #94a3b8;
-  
-  --primary: #f8fafc;
-  --primary-fg: #020817;
+  --bg: #151515;
+  --fg: #F5F3EF;
+  --surface: #1E1E1E;
+  --surface-2: #242424;
+  --border-color: #33312E;
+  --muted: #77736D;
+  --muted-fg: #A7A39C;
+  --primary: #F29B5B;
+  --primary-fg: #181818;
+  --dark-action: #F5F3EF;
+  --dark-action-fg: #181818;
+  --color-success: #6FA687;
+  --color-warning: #D19A43;
+  --color-critical: #D66A61;
 }
+
+html {
+  font-size: 16px;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
 
 
 body {

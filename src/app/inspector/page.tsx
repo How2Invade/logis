@@ -58,94 +58,100 @@ export default function InspectorPage() {
       {/* Header */}
       <header className="h-14 border-b border-border flex items-center px-6 gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded-md bg-foreground flex items-center justify-center">
-            <Activity className="w-4 h-4 text-background" />
+          <div className="w-6 h-6 rounded bg-dark-action flex items-center justify-center">
+            <Activity className="w-3.5 h-3.5 text-dark-action-fg" />
           </div>
-          <span className="font-bold text-sm">LOGIS</span>
+          <span className="font-bold text-[14px] tracking-widest">LOGIS</span>
           <span className="text-xs text-muted-foreground">Quality Control Center</span>
         </div>
         <div className="flex-1" />
-        <span className="px-2 py-1 rounded text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/30">SIMULATED</span>
+        <span className="px-2 py-1 rounded text-[10px] bg-warning/10 text-warning border border-warning/20 font-bold uppercase tracking-widest">SIMULATED</span>
         <button onClick={() => { document.cookie = 'logis_role=; path=/; max-age=0'; router.push('/'); }}
-          className="text-xs text-muted-foreground hover:text-foreground">Switch Role</button>
+          className="text-xs font-bold uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors">Switch Role</button>
       </header>
 
-      <div className="p-6 max-w-[1100px] mx-auto space-y-6">
+      <div className="p-8 max-w-[1200px] mx-auto space-y-8">
         {/* Counters */}
-        <div className="grid grid-cols-4 gap-4">
-          <CounterCard icon={ClipboardCheck} label="Today's Inspections" value={todayInspections.length} color="text-blue-400" />
-          <CounterCard icon={CheckCircle2} label="Passed" value={passed} color="text-emerald-400" />
-          <CounterCard icon={XCircle} label="Failed" value={failed} color="text-red-400" />
-          <CounterCard icon={Clock} label="Pending" value={0} color="text-amber-400" />
+        <div className="grid grid-cols-4 gap-6">
+          <CounterCard icon={ClipboardCheck} label="Today's Inspections" value={todayInspections.length} color="text-foreground" />
+          <CounterCard icon={CheckCircle2} label="Passed" value={passed} color="text-success" />
+          <CounterCard icon={XCircle} label="Failed" value={failed} color="text-critical" />
+          <CounterCard icon={Clock} label="Pending" value={0} color="text-warning" />
         </div>
 
         {/* Actions */}
         <button onClick={() => setShowModal(true)}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-colors">
+          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-dark-action text-dark-action-fg text-[14px] font-semibold hover:opacity-90 transition-all shadow-sm">
           <Plus className="w-4 h-4" /> Simulate Inspection
         </button>
 
         {/* Flag Result */}
         {showFlagResult && (
-          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-5">
+          <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
             <div className="flex items-center gap-3 mb-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <h3 className="text-sm font-medium text-emerald-400">INCIDENT CREATED</h3>
+              <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 text-success" />
+              </div>
+              <h3 className="text-[14px] font-bold text-foreground uppercase tracking-widest">INCIDENT CREATED</h3>
             </div>
-            <p className="text-sm text-muted-foreground mb-3">Lot {showFlagResult} has been flagged. The Operations Manager will see this incident.</p>
+            <p className="text-sm text-muted-foreground mb-4">Lot {showFlagResult} has been flagged. The Operations Manager will see this incident.</p>
             <button onClick={() => { router.push('/dashboard'); }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-border bg-surface text-sm hover:bg-surface-2 transition-colors">
-              Open in LOGIS <ArrowRight className="w-3.5 h-3.5" />
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full border border-border bg-surface text-[14px] font-semibold hover:bg-surface-2 transition-all shadow-sm">
+              Open in LOGIS <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         )}
 
         {/* Recent Inspections */}
-        <div className="rounded-lg border border-border bg-surface overflow-hidden">
-          <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-medium">Recent Inspections</h3>
+        <div className="rounded-2xl border border-border bg-surface shadow-sm overflow-hidden">
+          <div className="px-6 py-5 border-b border-border bg-surface-2/30">
+            <h3 className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Recent Inspections</h3>
           </div>
           <div className="divide-y divide-border">
             {inspections.map(insp => (
-              <div key={insp.id} className="flex items-center gap-4 px-5 py-3">
+              <div key={insp.id} className="flex items-center gap-4 px-6 py-4">
                 {insp.result === 'pass' ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <CheckCircle2 className="w-5 h-5 text-success shrink-0" />
                 ) : (
-                  <XCircle className="w-4 h-4 text-red-400 shrink-0" />
+                  <XCircle className="w-5 h-5 text-critical shrink-0" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm">{insp.testType} — {insp.lotId}</div>
-                  <div className="text-xs text-muted-foreground">{insp.productId} / {insp.batchId}</div>
+                  <div className="text-[14px] font-medium">{insp.testType} — {insp.lotId}</div>
+                  <div className="text-[13px] text-muted-foreground">{insp.productId} / {insp.batchId}</div>
                 </div>
-                <span className={cn('px-2 py-0.5 rounded text-[10px] font-medium uppercase',
-                  insp.result === 'pass' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400')}>
+                <span className={cn('px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest',
+                  insp.result === 'pass' ? 'bg-success/10 text-success' : 'bg-critical/10 text-critical')}>
                   {insp.result}
                 </span>
-                <span className="text-xs text-muted">{formatDateTime(insp.createdAt)}</span>
+                <span className="text-[12px] text-muted-foreground tabular-nums">{formatDateTime(insp.createdAt)}</span>
               </div>
             ))}
             {inspections.length === 0 && (
-              <div className="px-5 py-8 text-center text-sm text-muted-foreground">No inspections yet</div>
+              <div className="px-6 py-12 text-center text-[13px] text-muted-foreground">No inspections yet</div>
             )}
           </div>
         </div>
 
         {/* Recent Incidents */}
-        <div className="rounded-lg border border-border bg-surface overflow-hidden">
-          <div className="px-5 py-4 border-b border-border">
-            <h3 className="text-sm font-medium">Recent Incidents</h3>
+        <div className="rounded-2xl border border-border bg-surface shadow-sm overflow-hidden">
+          <div className="px-6 py-5 border-b border-border bg-surface-2/30">
+            <h3 className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Recent Incidents</h3>
           </div>
           <div className="divide-y divide-border">
             {incidents.map(inc => (
-              <div key={inc.id} className="flex items-center gap-4 px-5 py-3">
-                <AlertTriangle className={cn('w-4 h-4 shrink-0',
-                  inc.severity === 'critical' ? 'text-red-400' : 'text-orange-400')} />
-                <div className="flex-1"><div className="text-sm">{inc.title}</div></div>
-                <span className={cn('px-2 py-0.5 rounded text-[10px] font-medium uppercase', severityColors[inc.severity])}>
+              <div key={inc.id} className="flex items-center gap-4 px-6 py-4">
+                <AlertTriangle className={cn('w-5 h-5 shrink-0',
+                  inc.severity === 'critical' ? 'text-critical' : 'text-warning')} />
+                <div className="flex-1"><div className="text-[14px] font-medium">{inc.title}</div></div>
+                <span className={cn('px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest', 
+                  inc.severity === 'critical' ? 'bg-critical/10 text-critical' : 'bg-warning/10 text-warning')}>
                   {inc.severity}
                 </span>
               </div>
             ))}
+            {incidents.length === 0 && (
+              <div className="px-6 py-12 text-center text-[13px] text-muted-foreground">No recent incidents</div>
+            )}
           </div>
         </div>
       </div>
@@ -222,18 +228,18 @@ function InspectionModal({ onClose, onComplete }: { onClose: () => void; onCompl
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div className="relative w-full max-w-md bg-surface border border-border rounded-xl p-6" onClick={e => e.stopPropagation()}>
+      <div className="relative w-full max-w-md bg-surface border border-border rounded-2xl p-8 shadow-sm" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold">Simulate Inspection</h2>
-          <button onClick={onClose} className="p-1 rounded hover:bg-surface-2"><X className="w-4 h-4" /></button>
+          <h2 className="text-[18px] font-bold text-foreground">Simulate Inspection</h2>
+          <button onClick={onClose} className="p-1 rounded-full hover:bg-surface-2 transition-colors"><X className="w-5 h-5 text-muted-foreground" /></button>
         </div>
-        <span className="px-2 py-0.5 rounded text-[9px] bg-amber-500/15 text-amber-400 border border-amber-500/30 mb-4 inline-block">SIMULATED</span>
+        <span className="px-2 py-1 rounded text-[10px] bg-warning/10 text-warning border border-warning/20 mb-6 inline-block font-bold uppercase tracking-widest">SIMULATED</span>
 
-        <div className="space-y-4 mt-4">
+        <div className="space-y-4 mt-2">
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">Product</label>
+            <label className="text-[12px] font-medium text-foreground block mb-2">Product</label>
             <select value={form.productId} onChange={e => setForm(f => ({ ...f, productId: e.target.value }))}
-              className="w-full px-3 py-2 rounded-md border border-border bg-surface-2 text-sm outline-none">
+              className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface-2 text-[13px] outline-none focus:ring-2 focus:ring-primary/20 transition-all">
               <option value="P-001">P-001 — Nova Fresh Milk 500ml</option>
               <option value="P-002">P-002 — Nova Paneer 200g</option>
               <option value="P-003">P-003 — Product C — Nova Yogurt 400g</option>
@@ -241,22 +247,22 @@ function InspectionModal({ onClose, onComplete }: { onClose: () => void; onCompl
               <option value="P-005">P-005 — Nova Wheat Bread</option>
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Batch</label>
+              <label className="text-[12px] font-medium text-foreground block mb-2">Batch</label>
               <input value={form.batchId} onChange={e => setForm(f => ({ ...f, batchId: e.target.value }))}
-                className="w-full px-3 py-2 rounded-md border border-border bg-surface-2 text-sm outline-none" />
+                className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface-2 text-[13px] outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Lot</label>
+              <label className="text-[12px] font-medium text-foreground block mb-2">Lot</label>
               <input value={form.lotId} onChange={e => setForm(f => ({ ...f, lotId: e.target.value }))}
-                className="w-full px-3 py-2 rounded-md border border-border bg-surface-2 text-sm outline-none" />
+                className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface-2 text-[13px] outline-none focus:ring-2 focus:ring-primary/20 transition-all" />
             </div>
           </div>
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">Test Type</label>
+            <label className="text-[12px] font-medium text-foreground block mb-2">Test Type</label>
             <select value={form.testType} onChange={e => setForm(f => ({ ...f, testType: e.target.value }))}
-              className="w-full px-3 py-2 rounded-md border border-border bg-surface-2 text-sm outline-none">
+              className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface-2 text-[13px] outline-none focus:ring-2 focus:ring-primary/20 transition-all">
               <option value="microbial_contamination">Microbial Contamination</option>
               <option value="chemical_analysis">Chemical Analysis</option>
               <option value="ph_level">pH Level</option>
@@ -265,26 +271,26 @@ function InspectionModal({ onClose, onComplete }: { onClose: () => void; onCompl
             </select>
           </div>
           <div>
-            <label className="text-xs text-muted-foreground block mb-1">Result</label>
+            <label className="text-[12px] font-medium text-foreground block mb-2">Result</label>
             <div className="flex gap-2">
               <button onClick={() => setForm(f => ({ ...f, result: 'pass' }))}
-                className={cn('flex-1 py-2 rounded-md border text-sm font-medium transition-colors',
-                  form.result === 'pass' ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-400' : 'border-border bg-surface-2 text-muted-foreground')}>
+                className={cn('flex-1 py-2.5 rounded-lg border text-[13px] font-bold uppercase tracking-widest transition-colors',
+                  form.result === 'pass' ? 'border-success/30 bg-success/10 text-success' : 'border-border bg-surface-2 text-muted-foreground')}>
                 PASS
               </button>
               <button onClick={() => setForm(f => ({ ...f, result: 'fail' }))}
-                className={cn('flex-1 py-2 rounded-md border text-sm font-medium transition-colors',
-                  form.result === 'fail' ? 'border-red-500/50 bg-red-500/10 text-red-400' : 'border-border bg-surface-2 text-muted-foreground')}>
+                className={cn('flex-1 py-2.5 rounded-lg border text-[13px] font-bold uppercase tracking-widest transition-colors',
+                  form.result === 'fail' ? 'border-critical/30 bg-critical/10 text-critical' : 'border-border bg-surface-2 text-muted-foreground')}>
                 FAIL
               </button>
             </div>
           </div>
           {form.result === 'fail' && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">Severity</label>
+                <label className="text-[12px] font-medium text-foreground block mb-2">Severity</label>
                 <select value={form.severity} onChange={e => setForm(f => ({ ...f, severity: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-md border border-border bg-surface-2 text-sm outline-none">
+                  className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface-2 text-[13px] outline-none focus:ring-2 focus:ring-primary/20 transition-all">
                   <option value="critical">Critical</option>
                   <option value="high">High</option>
                   <option value="medium">Medium</option>
@@ -292,9 +298,9 @@ function InspectionModal({ onClose, onComplete }: { onClose: () => void; onCompl
                 </select>
               </div>
               <div>
-                <label className="text-xs text-muted-foreground block mb-1">Incident Type</label>
+                <label className="text-[12px] font-medium text-foreground block mb-2">Incident Type</label>
                 <select value={form.incidentType} onChange={e => setForm(f => ({ ...f, incidentType: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-md border border-border bg-surface-2 text-sm outline-none">
+                  className="w-full px-3 py-2.5 rounded-lg border border-border bg-surface-2 text-[13px] outline-none focus:ring-2 focus:ring-primary/20 transition-all">
                   <option value="contamination">Contamination</option>
                   <option value="temperature_excursion">Temperature Excursion</option>
                   <option value="component_defect">Component Defect</option>
@@ -302,10 +308,12 @@ function InspectionModal({ onClose, onComplete }: { onClose: () => void; onCompl
               </div>
             </div>
           )}
-          <button onClick={handleSubmit}
-            className="w-full py-2.5 rounded-md bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-colors">
-            {form.result === 'fail' ? 'Flag Incident' : 'Log Inspection'}
-          </button>
+          <div className="pt-4">
+            <button onClick={handleSubmit}
+              className="w-full py-3 rounded-full bg-dark-action text-dark-action-fg text-[14px] font-semibold hover:opacity-90 transition-all shadow-sm">
+              {form.result === 'fail' ? 'Flag Incident' : 'Log Inspection'}
+            </button>
+          </div>
         </div>
       </div>
     </div>

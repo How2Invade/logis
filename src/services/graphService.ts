@@ -56,18 +56,21 @@ export function buildGraph(data: {
   }
 
   function addEdge(source: string, target: string, label: string, confidence: Confidence = 'confirmed', fractionUsed?: number) {
-    edges.push({
-      id: `${source}->${target}`,
-      source,
-      target,
-      label,
-      confidence,
-      fractionUsed,
-    });
-    const adj = adjacency.get(source) || [];
-    if (!adj.includes(target)) {
-      adj.push(target);
-      adjacency.set(source, adj);
+    const id = `${source}->${target}`;
+    if (!edges.find(e => e.id === id)) {
+      edges.push({
+        id,
+        source,
+        target,
+        label,
+        confidence,
+        fractionUsed,
+      });
+      const adj = adjacency.get(source) || [];
+      if (!adj.includes(target)) {
+        adj.push(target);
+        adjacency.set(source, adj);
+      }
     }
   }
 

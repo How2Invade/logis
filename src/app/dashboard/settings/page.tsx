@@ -20,33 +20,36 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-6 max-w-[800px] mx-auto space-y-6">
-      <h1 className="text-xl font-semibold">Settings</h1>
+    <div className="px-8 lg:px-10 py-7 max-w-[1400px] mx-auto space-y-6 min-h-screen text-foreground transition-colors duration-300">
+      <div>
+        <h1 className="text-[32px] font-semibold text-foreground mb-1">Settings</h1>
+        <p className="text-[14px] text-muted-foreground">Manage environment and preferences</p>
+      </div>
 
-      <div className="rounded-lg border border-border bg-surface p-5">
-        <h3 className="text-sm font-medium mb-4 flex items-center gap-2">
-          <RotateCcw className="w-4 h-4" /> Demo Controls
+      <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        <h3 className="text-[15px] font-semibold text-foreground mb-4 flex items-center gap-2">
+          <RotateCcw className="w-4 h-4 text-muted-foreground" /> Demo Controls
         </h3>
-        <p className="text-xs text-muted-foreground mb-4">Reset the database to the original seeded demo scenario.</p>
+        <p className="text-[13px] text-muted-foreground mb-6">Reset the database to the original seeded demo scenario.</p>
         <button onClick={handleReset} disabled={resetting}
-          className="px-5 py-2 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium hover:bg-red-500/20 transition-colors disabled:opacity-50">
+          className="px-6 py-2.5 rounded-full bg-surface-2 border border-border text-critical text-[14px] font-semibold hover:bg-surface transition-colors disabled:opacity-50 shadow-sm">
           {resetting ? 'Resetting…' : 'Reset Demo'}
         </button>
       </div>
 
-      <div className="rounded-lg border border-border bg-surface p-5">
-        <h3 className="text-sm font-medium mb-4 flex items-center gap-2">
-          <Gauge className="w-4 h-4" /> Accessibility
+      <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm">
+        <h3 className="text-[15px] font-semibold text-foreground mb-4 flex items-center gap-2">
+          <Gauge className="w-4 h-4 text-muted-foreground" /> Accessibility
         </h3>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Reduced motion</span>
-            <span className="text-xs text-muted">Uses prefers-reduced-motion</span>
+            <span className="text-[14px] text-foreground font-medium">Reduced motion</span>
+            <span className="text-[13px] text-muted-foreground">Uses prefers-reduced-motion</span>
           </div>
         </div>
       </div>
       
-      <div className="text-xs text-muted text-center space-y-1">
+      <div className="text-[11px] uppercase tracking-widest font-bold text-muted-foreground text-center space-y-1 mt-10 pt-8 border-t border-border/50">
         <p>LOGIS — Product Incident Intelligence & Operational Recovery</p>
         <p>DEMO ENVIRONMENT · Synthetic operational network · All data is simulated</p>
       </div>

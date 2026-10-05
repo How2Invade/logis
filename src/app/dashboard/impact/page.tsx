@@ -1,59 +1,48 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { ReactFlow, Background, Controls, MiniMap, Panel, useNodesState, useEdgesState, MarkerType } from '@xyflow/react';
+import { ReactFlow, Background, Controls, MiniMap, Panel, useNodesState, useEdgesState, MarkerType, useReactFlow, ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
-import { cn, statusColors, formatNumber } from '@/lib/utils';
-import type { ImpactResult, GraphNode as GNode, GraphEdge as GEdge, ClassificationStatus } from '@/lib/types';
-import { X, Search, Filter, Eye, ZoomIn, Maximize2, AlertTriangle } from 'lucide-react';
+import { cn, formatNumber } from '@/lib/utils';
+import type { ImpactResult, GraphNode as GNode, GraphEdge as GEdge } from '@/lib/types';
+import { X, AlertTriangle, Crosshair, Map as MapIcon, Play } from 'lucide-react';
+import { ImpactNode } from './components/ImpactNode';
 
-const nodeColors: Record<string, { bg: string; border: string; text: string }> = {
-  source: { bg: 'color-mix(in srgb, var(--color-primary) 15%, transparent)', border: 'var(--color-primary)', text: 'var(--color-foreground)' },
-  affected: { bg: 'color-mix(in srgb, var(--color-red) 15%, transparent)', border: 'var(--color-red)', text: 'var(--color-foreground)' },
-  uncertain: { bg: 'color-mix(in srgb, var(--color-amber) 15%, transparent)', border: 'var(--color-amber)', text: 'var(--color-foreground)' },
-  safe: { bg: 'color-mix(in srgb, var(--color-emerald) 15%, transparent)', border: 'var(--color-emerald)', text: 'var(--color-foreground)' },
-  sold: { bg: 'color-mix(in srgb, var(--color-purple) 15%, transparent)', border: 'var(--color-purple)', text: 'var(--color-foreground)' },
-  unaccounted: { bg: 'color-mix(in srgb, var(--color-orange) 15%, transparent)', border: 'var(--color-orange)', text: 'var(--color-foreground)' },
-  not_relevant: { bg: 'var(--color-surface)', border: 'var(--color-border)', text: 'var(--color-muted-foreground)' },
+const nodeTypes = {
+  impactNode: ImpactNode,
 };
 
-const typeLabels: Record<string, string> = {
-  supplier: 'Supplier',
-  material: 'Material',
-  lot: 'Lot',
-  batch: 'Batch',
-  product: 'Product',
-  warehouse: 'Warehouse',
-  shipment: 'Shipment',
-  store: 'Store',
-  customer: 'Customer',
-};
+function getReachableNodes(startNodeId: string, edges: GEdge[], direction: 'upstream' | 'downstream'): Set<string> {
+  const visited = new Set<string>([startNodeId]);
+  const queue = [startNodeId];
 
-const typeColumns: Record<string, number> = {
-  supplier: 0,
-  material: 1,
-  lot: 2,
-  batch: 3,
-  product: 4,
-  warehouse: 5,
-  shipment: 6,
-  store: 7,
-};
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const edge of edges) {
+      if (direction === 'downstream' && edge.source === current && !visited.has(edge.target)) {
+        visited.add(edge.target);
+        queue.push(edge.target);
+      } else if (direction === 'upstream' && edge.target === current && !visited.has(edge.source)) {
+        visited.add(edge.source);
+        queue.push(edge.source);
+      }
+    }
+  }
+  return visited;
+}
 
-function layoutNodes(gnodes: GNode[], gedges: GEdge[]) {
+function layoutElements(gnodes: GNode[], gedges: GEdge[]) {
   const g = new dagre.graphlib.Graph();
-  g.setGraph({ rankdir: 'LR', ranksep: 120, nodesep: 40, marginx: 40, marginy: 40 });
+  g.setGraph({ rankdir: 'LR', ranksep: 180, nodesep: 50, marginx: 60, marginy: 60 });
   g.setDefaultEdgeLabel(() => ({}));
 
-  // Only include relevant nodes (reduce visual clutter)
-  const relevantNodes = gnodes.filter(n => 
-    n.status !== 'not_relevant' || n.type === 'supplier' || n.type === 'material'
-  );
+  // Filter out irrelevant ones
+  const relevantNodes = gnodes.filter(n => n.status !== 'not_relevant' || n.type === 'supplier');
   const relevantNodeIds = new Set(relevantNodes.map(n => n.id));
 
   for (const node of relevantNodes) {
-    g.setNode(node.id, { width: 180, height: 60 });
+    g.setNode(node.id, { width: 180, height: 80 });
   }
 
   for (const edge of gedges) {
@@ -64,219 +53,338 @@ function layoutNodes(gnodes: GNode[], gedges: GEdge[]) {
 
   dagre.layout(g);
 
-  const nodes = relevantNodes.map(node => {
+  const initialNodes = relevantNodes.map(node => {
     const pos = g.node(node.id);
-    const colors = nodeColors[node.status] || nodeColors.not_relevant;
     return {
       id: node.id,
-      type: 'default',
+      type: 'impactNode',
       position: { x: pos?.x || 0, y: pos?.y || 0 },
       data: {
-        label: (
-          <div className="text-center px-2">
-            <div className="text-[9px] uppercase tracking-wider opacity-60">{typeLabels[node.type]}</div>
-            <div className="text-xs font-medium truncate mt-0.5">{node.label}</div>
-            {node.quantity && <div className="text-[10px] opacity-70 mt-0.5">{formatNumber(node.quantity)} units</div>}
-          </div>
-        ),
+        ...node,
+        isSelected: false,
+        isMuted: false,
       },
-      style: {
-        background: colors.bg,
-        border: `1.5px solid ${colors.border}`,
-        borderRadius: node.status === 'source' ? 'var(--radius-full)' : 'var(--radius-lg)',
-        color: colors.text,
-        width: 180,
-        fontSize: '12px',
-        padding: '8px 4px',
-      },
-      sourcePosition: 'right' as const,
-      targetPosition: 'left' as const,
     };
   });
 
-  const edges = gedges
-    .filter(e => relevantNodeIds.has(e.source) && relevantNodeIds.has(e.target))
-    .map(edge => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      type: 'bezier',
-      animated: edge.confidence !== 'confirmed',
-      style: {
-        stroke: edge.confidence === 'confirmed' ? 'var(--color-red)' : edge.confidence === 'probable' ? 'var(--color-amber)' : 'var(--color-muted)',
-        strokeWidth: 1.5,
-        opacity: 0.6,
-      },
-      markerEnd: { type: MarkerType.ArrowClosed, width: 12, height: 12, color: 'var(--color-muted)' },
-      label: edge.confidence !== 'confirmed' ? edge.confidence : undefined,
-      labelStyle: { fill: 'var(--color-muted-foreground)', fontSize: 9 },
-    }));
+  const nodeStatusMap = new Map(relevantNodes.map(n => [n.id, n.status]));
 
-  return { nodes, edges };
+  const initialEdges = gedges
+    .filter(e => relevantNodeIds.has(e.source) && relevantNodeIds.has(e.target))
+    .map(edge => {
+      const targetStatus = nodeStatusMap.get(edge.target) || 'not_relevant';
+      
+      let baseStroke = 'var(--color-border)';
+      if (targetStatus === 'affected' || targetStatus === 'source') baseStroke = 'var(--color-critical)';
+      else if (targetStatus === 'uncertain') baseStroke = 'var(--color-warning)';
+      else if (targetStatus === 'safe') baseStroke = 'var(--color-success)';
+      else if (targetStatus === 'sold') baseStroke = 'var(--color-muted-foreground)';
+
+      const isImportant = targetStatus === 'affected' || targetStatus === 'source';
+
+      return {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        type: 'bezier',
+        animated: edge.confidence !== 'confirmed',
+        style: {
+          stroke: baseStroke,
+          strokeWidth: isImportant ? 2 : 1.5,
+          opacity: isImportant ? 0.8 : 0.5,
+        },
+        data: {
+          baseStroke,
+          baseWidth: isImportant ? 2 : 1.5,
+        },
+        markerEnd: { 
+          type: MarkerType.ArrowClosed, 
+          width: 12, height: 12, 
+          color: baseStroke 
+        },
+      };
+    });
+
+  return { initialNodes, initialEdges };
+}
+
+function ImpactFlow({ impact }: { impact: ImpactResult }) {
+  const [nodes, setNodes, onNodesChange] = useNodesState<any>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<any>([]);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const { fitView, setCenter } = useReactFlow();
+
+  useEffect(() => {
+    const { initialNodes, initialEdges } = layoutElements(impact.nodes, impact.edges);
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+    setTimeout(() => fitView({ padding: 0.2, duration: 800 }), 100);
+  }, [impact, setNodes, setEdges, fitView]);
+
+  // Update nodes and edges based on selection
+  useEffect(() => {
+    if (!selectedNodeId) {
+      setNodes(nds => nds.map(n => ({ ...n, data: { ...n.data, isSelected: false, isMuted: false } })));
+      setEdges(eds => eds.map(e => ({
+        ...e,
+        style: { ...e.style, stroke: e.data.baseStroke, strokeWidth: e.data.baseWidth, opacity: e.data.baseWidth === 2 ? 0.8 : 0.4 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: e.data.baseStroke }
+      })));
+      return;
+    }
+
+    const down = getReachableNodes(selectedNodeId, impact.edges, 'downstream');
+    const up = getReachableNodes(selectedNodeId, impact.edges, 'upstream');
+    const activeIds = new Set([...Array.from(down), ...Array.from(up)]);
+
+    setNodes(nds => nds.map(n => ({
+      ...n,
+      data: {
+        ...n.data,
+        isSelected: n.id === selectedNodeId,
+        isMuted: !activeIds.has(n.id)
+      }
+    })));
+
+    setEdges(eds => eds.map(e => {
+      const isPath = activeIds.has(e.source) && activeIds.has(e.target);
+      return {
+        ...e,
+        style: {
+          ...e.style,
+          stroke: e.data.baseStroke,
+          strokeWidth: isPath ? e.data.baseWidth + 1 : e.data.baseWidth,
+          opacity: isPath ? 1 : 0.15,
+        },
+        markerEnd: { type: MarkerType.ArrowClosed, color: e.data.baseStroke }
+      };
+    }));
+  }, [selectedNodeId, impact.edges, setNodes, setEdges]);
+
+  const handleNodeClick = useCallback((_: any, node: any) => {
+    setSelectedNodeId(prev => prev === node.id ? null : node.id);
+  }, []);
+
+  const focusIncident = () => {
+    const sourceNode = nodes.find(n => n.data.status === 'source');
+    if (sourceNode) {
+      setSelectedNodeId(sourceNode.id);
+      setCenter(sourceNode.position.x + 90, sourceNode.position.y + 40, { zoom: 1.2, duration: 800 });
+    }
+  };
+
+  const showFullNetwork = () => {
+    setSelectedNodeId(null);
+    fitView({ padding: 0.2, duration: 800 });
+  };
+
+  const selectedData = selectedNodeId ? nodes.find(n => n.id === selectedNodeId)?.data : null;
+
+  return (
+    <div className="w-full h-full flex relative rounded-2xl border border-border bg-surface overflow-hidden shadow-sm">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={handleNodeClick}
+        onPaneClick={() => setSelectedNodeId(null)}
+        nodeTypes={nodeTypes}
+        minZoom={0.1}
+        maxZoom={2}
+        proOptions={{ hideAttribution: true }}
+        fitView
+      >
+        <Background color="var(--color-muted-foreground)" gap={20} size={1} className="opacity-20" />
+        
+        {/* Controls Overlay */}
+        <Panel position="bottom-left" className="mb-4 ml-4 flex gap-2">
+          <button onClick={focusIncident} className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface-2 border border-border text-[13px] font-semibold text-foreground hover:bg-surface shadow-sm transition-colors">
+            <Crosshair className="w-4 h-4 text-critical" /> Focus Incident
+          </button>
+          <button onClick={showFullNetwork} className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface-2 border border-border text-[13px] font-semibold text-foreground hover:bg-surface shadow-sm transition-colors">
+            <MapIcon className="w-4 h-4 text-muted-foreground" /> Full Network
+          </button>
+        </Panel>
+
+        <Controls showInteractive={false} className="!bg-surface !border-border !rounded-lg !shadow-sm !overflow-hidden" />
+
+        {/* Legend */}
+        <Panel position="top-left" className="mt-4 ml-4">
+          <div className="bg-surface/90 backdrop-blur-sm border border-border rounded-xl p-3.5 space-y-2 shadow-sm">
+            <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-3">Legend</div>
+            <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-critical" /><span className="text-[12px] font-medium">Affected</span></div>
+            <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-warning" /><span className="text-[12px] font-medium">Needs Verification</span></div>
+            <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-success" /><span className="text-[12px] font-medium">Safe</span></div>
+            <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-muted-foreground" /><span className="text-[12px] font-medium">Already Sold</span></div>
+            <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-border" /><span className="text-[12px] font-medium text-muted-foreground">Normal</span></div>
+          </div>
+        </Panel>
+      </ReactFlow>
+
+      {/* Stats overlay (Top Right) */}
+      <div className="absolute top-4 right-4 z-10 flex gap-3 pointer-events-none">
+        <div className="bg-surface/90 backdrop-blur-sm border border-border rounded-xl px-4 py-3 text-right shadow-sm pointer-events-auto">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Affected</div>
+          <div className="text-xl font-semibold tabular-nums text-critical">{formatNumber(impact.affectedUnits)}</div>
+        </div>
+        <div className="bg-surface/90 backdrop-blur-sm border border-border rounded-xl px-4 py-3 text-right shadow-sm pointer-events-auto">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Uncertain</div>
+          <div className="text-xl font-semibold tabular-nums text-warning">{formatNumber(impact.uncertainUnits)}</div>
+        </div>
+        <div className="bg-surface/90 backdrop-blur-sm border border-border rounded-xl px-4 py-3 text-right shadow-sm pointer-events-auto">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Safe</div>
+          <div className="text-xl font-semibold tabular-nums text-success">{formatNumber(impact.safeUnits)}</div>
+        </div>
+      </div>
+
+      {/* Details Panel */}
+      {selectedData && (
+        <div className="absolute right-4 top-24 bottom-4 w-80 bg-surface/95 backdrop-blur-md rounded-2xl border border-border z-50 flex flex-col shadow-lg overflow-hidden animate-in slide-in-from-right-4 duration-300">
+          <div className="p-5 border-b border-border/50 flex items-center justify-between bg-surface-2/30">
+            <div>
+              <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Entity Details</div>
+              <h3 className="text-[15px] font-semibold text-foreground truncate max-w-[200px]">{selectedData.label}</h3>
+            </div>
+            <button onClick={() => setSelectedNodeId(null)} className="p-1.5 rounded-md hover:bg-surface-2 transition-colors">
+              <X className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+          
+          <div className="p-5 flex-1 overflow-y-auto space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="flex-1">
+                <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Type</div>
+                <div className="text-[14px] capitalize font-medium text-foreground">{selectedData.type}</div>
+              </div>
+              <div className="flex-1">
+                <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">ID</div>
+                <div className="text-[13px] text-muted-foreground font-mono">{selectedData.id}</div>
+              </div>
+            </div>
+            
+            <div>
+              <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Status</div>
+              <span className={cn(
+                'px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest border', 
+                selectedData.status === 'affected' ? 'bg-critical/10 text-critical border-critical/50' :
+                selectedData.status === 'uncertain' ? 'bg-warning/10 text-warning border-warning/50' :
+                selectedData.status === 'safe' ? 'bg-success/10 text-success border-success/50' :
+                selectedData.status === 'source' ? 'bg-critical/10 text-critical border-critical/50' :
+                'bg-surface-2 text-muted-foreground border-border'
+              )}>
+                {selectedData.status.replace('_', ' ')}
+              </span>
+            </div>
+
+            {selectedData.quantity && (
+              <div>
+                <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Quantity</div>
+                <div className="text-[15px] font-semibold tabular-nums text-foreground">{formatNumber(selectedData.quantity)} <span className="text-[12px] font-medium text-muted-foreground">units</span></div>
+              </div>
+            )}
+
+            {selectedData.reason && (
+              <div>
+                <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-1.5">Reason</div>
+                <div className="text-[13px] text-foreground leading-relaxed bg-surface-2 p-3 rounded-xl border border-border">
+                  {selectedData.reason}
+                </div>
+              </div>
+            )}
+            
+            {selectedData.path && selectedData.path.length > 0 && (
+              <div>
+                <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Lineage</div>
+                <div className="bg-surface-2 p-3 rounded-xl border border-border flex flex-col gap-1.5 relative">
+                  {selectedData.path.map((step: string, i: number) => (
+                    <div key={i} className="flex flex-col">
+                      <div className="text-[12px] font-medium text-foreground">{step}</div>
+                      {i < selectedData.path.length - 1 && (
+                        <div className="text-muted-foreground/40 text-[10px] ml-1 mt-0.5 mb-0.5">↓</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button 
+              onClick={() => {
+                const down = getReachableNodes(selectedData.id, impact.edges, 'downstream');
+                const up = getReachableNodes(selectedData.id, impact.edges, 'upstream');
+                const activeIds = new Set([...Array.from(down), ...Array.from(up)]);
+                setNodes(nds => nds.map(n => ({
+                  ...n, data: { ...n.data, isSelected: n.id === selectedData.id, isMuted: !activeIds.has(n.id) }
+                })));
+                fitView({ nodes: nodes.filter(n => activeIds.has(n.id)), padding: 0.2, duration: 800 });
+              }}
+              className="w-full py-3 bg-dark-action text-dark-action-fg rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-sm mt-4"
+            >
+              <Play className="w-4 h-4 fill-current" /> Trace Downstream
+            </button>
+            
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function ImpactMapPage() {
   const [impact, setImpact] = useState<ImpactResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedNode, setSelectedNode] = useState<GNode | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [nodes, setNodes, onNodesChange] = useNodesState<any>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<any>([]);
 
   useEffect(() => {
+    async function runAnalysis() {
+      try {
+        const res = await fetch('/api/incidents/INC-001/analyze', { method: 'POST' });
+        if (!res.ok) throw new Error('Analysis failed');
+        const data = await res.json();
+        setImpact(data.data);
+        setLoading(false);
+      } catch (e: any) {
+        setError(e.message);
+        setLoading(false);
+      }
+    }
     runAnalysis();
   }, []);
 
-  async function runAnalysis() {
-    try {
-      const res = await fetch('/api/incidents/INC-001/analyze', { method: 'POST' });
-      if (!res.ok) throw new Error('Analysis failed');
-      const data = await res.json();
-      setImpact(data.data);
-
-      const { nodes: layoutedNodes, edges: layoutedEdges } = layoutNodes(data.data.nodes, data.data.edges);
-      setNodes(layoutedNodes);
-      setEdges(layoutedEdges);
-      setLoading(false);
-    } catch (e: any) {
-      setError(e.message);
-      setLoading(false);
-    }
-  }
-
-  const onNodeClick = useCallback((_: any, node: any) => {
-    if (!impact) return;
-    const gNode = impact.nodes.find(n => n.id === node.id);
-    if (gNode) setSelectedNode(gNode);
-  }, [impact]);
-
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="skeleton w-12 h-12 rounded-full mx-auto mb-4" />
-          <p className="text-sm text-muted-foreground">Building impact map…</p>
-        </div>
+      <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center">
+        <div className="skeleton w-12 h-12 rounded-full mx-auto mb-4 animate-pulse" />
       </div>
     );
   }
 
-  if (error) {
+  if (error || !impact) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-center">
-          <AlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground">{error}</p>
-          <button onClick={runAnalysis} className="mt-4 px-4 py-2 rounded-md bg-surface border border-border text-sm hover:bg-surface-2">
-            Retry
-          </button>
+      <div className="h-[calc(100vh-3.5rem)] flex items-center justify-center text-center">
+        <div>
+          <AlertTriangle className="w-8 h-8 text-critical mx-auto mb-3" />
+          <p className="text-[14px] text-muted-foreground">{error || 'Failed to load'}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-[calc(100vh-3.5rem)] relative">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={onNodeClick}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.1}
-        maxZoom={2}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background color="#27272a" gap={20} size={1} />
-        <Controls showInteractive={false} className="!bg-surface !border-border !rounded-lg" />
-        <MiniMap
-          nodeColor={(node) => {
-            const style = node.style as any;
-            return style?.border || '#3f3f46';
-          }}
-          maskColor="rgba(0,0,0,0.7)"
-          className="!bg-surface !border-border !rounded-lg"
-        />
-
-        {/* Legend */}
-        <Panel position="top-left">
-          <div className="bg-surface/90 backdrop-blur-sm border border-border rounded-lg p-3 space-y-1.5">
-            <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider mb-2">Legend</div>
-            {Object.entries(nodeColors).filter(([k]) => k !== 'not_relevant').map(([status, colors]) => (
-              <div key={status} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded" style={{ background: colors.bg, border: `1px solid ${colors.border}` }} />
-                <span className="text-[10px] capitalize">{status.replace('_', ' ')}</span>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
-        {/* Stats */}
-        {impact && (
-          <Panel position="top-right">
-            <div className="bg-surface/90 backdrop-blur-sm border border-border rounded-lg p-3 text-xs space-y-1">
-              <div className="text-muted-foreground font-medium mb-2">Impact Summary</div>
-              <div className="flex justify-between gap-8"><span className="text-red-400">Affected:</span><span className="tabular-nums">{formatNumber(impact.affectedUnits)}</span></div>
-              <div className="flex justify-between gap-8"><span className="text-emerald-400">Safe:</span><span className="tabular-nums">{formatNumber(impact.safeUnits)}</span></div>
-              <div className="flex justify-between gap-8"><span className="text-amber-400">Uncertain:</span><span className="tabular-nums">{formatNumber(impact.uncertainUnits)}</span></div>
-              <div className="flex justify-between gap-8"><span className="text-purple-400">Sold:</span><span className="tabular-nums">{formatNumber(impact.soldUnits)}</span></div>
-            </div>
-          </Panel>
-        )}
-      </ReactFlow>
-
-      {/* Node Detail Panel */}
-      {selectedNode && (
-        <div className="absolute right-0 top-0 bottom-0 w-80 bg-surface border-l border-border z-50 overflow-y-auto">
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium">Node Details</h3>
-              <button onClick={() => setSelectedNode(null)} className="p-1 rounded hover:bg-surface-2">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Type</div>
-                <div className="text-sm capitalize">{selectedNode.type}</div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Label</div>
-                <div className="text-sm font-medium">{selectedNode.label}</div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Status</div>
-                <span className={cn('px-2 py-0.5 rounded text-[10px] font-medium border', statusColors[selectedNode.status])}>
-                  {selectedNode.status}
-                </span>
-              </div>
-              {selectedNode.reason && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Why</div>
-                  <div className="text-xs text-foreground/80 leading-relaxed">{selectedNode.reason}</div>
-                </div>
-              )}
-              {selectedNode.path.length > 0 && (
-                <div>
-                  <div className="text-xs text-muted-foreground mb-1">Path</div>
-                  <div className="text-[10px] text-muted-foreground">
-                    {selectedNode.path.join(' → ')}
-                  </div>
-                </div>
-              )}
-              {Object.entries(selectedNode.data).map(([key, value]) => (
-                <div key={key}>
-                  <div className="text-xs text-muted-foreground mb-1">{key.replace(/([A-Z])/g, ' $1').trim()}</div>
-                  <div className="text-xs">{String(value)}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+    <div className="px-8 lg:px-10 py-7 max-w-[1400px] mx-auto h-[calc(100vh-3.5rem)] flex flex-col space-y-5 text-foreground transition-colors duration-300">
+      <div className="shrink-0 flex items-center justify-between">
+        <div>
+          <h1 className="text-[32px] font-semibold text-foreground mb-1">Impact Analysis</h1>
+          <p className="text-[14px] text-muted-foreground">Interactive map of upstream sources and downstream contamination spread</p>
         </div>
-      )}
+      </div>
+
+      <div className="flex-1 min-h-0 relative">
+        <ReactFlowProvider>
+          <ImpactFlow impact={impact} />
+        </ReactFlowProvider>
+      </div>
     </div>
   );
 }
