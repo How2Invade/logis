@@ -164,3 +164,22 @@ body {
   transition: stroke 150ms ease;
 }
 
+/* AI Prediction Mode — amber glow pulse on uncertain nodes */
+@keyframes amber-glow {
+  0%, 100% { box-shadow: 0 0 0px 0px rgba(209, 154, 67, 0); }
+  50%       { box-shadow: 0 0 0px 6px rgba(209, 154, 67, 0.35); }
+}
+.node-amber-glow {
+  animation: amber-glow 1.8s ease-in-out infinite;
+}
+
+/* Trace sweep highlight */
+@keyframes node-sweep {
+  0%   { box-shadow: 0 0 0px 0px rgba(245, 243, 239, 0); outline-offset: 0px; }
+  40%  { box-shadow: 0 0 0px 8px rgba(245, 243, 239, 0.25); outline-offset: 3px; }
+  100% { box-shadow: 0 0 0px 0px rgba(245, 243, 239, 0); outline-offset: 0px; }
+}
+.node-sweep {
+  animation: node-sweep 0.6s ease-out forwards;
+}
+

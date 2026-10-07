@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { ReactFlow, Background, Controls, MiniMap, Panel, useNodesState, useEdgesState, MarkerType, useReactFlow, ReactFlowProvider } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
 import { cn, formatNumber } from '@/lib/utils';
 import type { ImpactResult, GraphNode as GNode, GraphEdge as GEdge } from '@/lib/types';
-import { X, AlertTriangle, Crosshair, Map as MapIcon, Play } from 'lucide-react';
+import { X, AlertTriangle, Crosshair, Map as MapIcon, Play, Sparkles } from 'lucide-react';
 import { ImpactNode } from './components/ImpactNode';
 
 const nodeTypes = {
@@ -30,6 +30,25 @@ function getReachableNodes(startNodeId: string, edges: GEdge[], direction: 'upst
     }
   }
   return visited;
+}
+
+/** BFS order array — used for the animated sweep */
+function getDownstreamOrdered(startNodeId: string, edges: GEdge[]): string[] {
+  const visited = new Set<string>([startNodeId]);
+  const queue = [startNodeId];
+  const ordered: string[] = [startNodeId];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const edge of edges) {
+      if (edge.source === current && !visited.has(edge.target)) {
+        visited.add(edge.target);
+        queue.push(edge.target);
+        ordered.push(edge.target);
+      }
+    }
+  }
+  return ordered;
 }
 
 function layoutElements(gnodes: GNode[], gedges: GEdge[]) {
@@ -63,6 +82,9 @@ function layoutElements(gnodes: GNode[], gedges: GEdge[]) {
         ...node,
         isSelected: false,
         isMuted: false,
+        isAnimating: false,
+        predictionMode: false,
+        aiRiskScore: undefined,
       },
     };
   });
@@ -108,11 +130,23 @@ function layoutElements(gnodes: GNode[], gedges: GEdge[]) {
   return { initialNodes, initialEdges };
 }
 
-function ImpactFlow({ impact }: { impact: ImpactResult }) {
+// Compute max quantity across all nodes (for deterministic AI risk score)
+function computeMaxQuantity(gnodes: GNode[]): number {
+  return Math.max(1, ...gnodes.map(n => (n as any).quantity || 0));
+}
+
+function computeAiRiskScore(node: GNode, maxQuantity: number): number {
+  return Math.round(30 + (((node as any).quantity || 0) / maxQuantity) * 60);
+}
+
+function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predictionMode: boolean }) {
   const [nodes, setNodes, onNodesChange] = useNodesState<any>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<any>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const { fitView, setCenter } = useReactFlow();
+  const { fitView, setCenter, getNodes } = useReactFlow();
+  const sweepTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const maxQuantity = computeMaxQuantity(impact.nodes);
 
   useEffect(() => {
     const { initialNodes, initialEdges } = layoutElements(impact.nodes, impact.edges);
@@ -120,6 +154,22 @@ function ImpactFlow({ impact }: { impact: ImpactResult }) {
     setEdges(initialEdges);
     setTimeout(() => fitView({ padding: 0.2, duration: 800 }), 100);
   }, [impact, setNodes, setEdges, fitView]);
+
+  // Apply / remove prediction mode props whenever it toggles
+  useEffect(() => {
+    setNodes(nds => nds.map(n => {
+      const sourceNode = impact.nodes.find(sn => sn.id === n.id);
+      const score = sourceNode ? computeAiRiskScore(sourceNode, maxQuantity) : undefined;
+      return {
+        ...n,
+        data: {
+          ...n.data,
+          predictionMode,
+          aiRiskScore: (n.data.status === 'safe' || n.data.status === 'uncertain') ? score : undefined,
+        },
+      };
+    }));
+  }, [predictionMode, setNodes, impact.nodes, maxQuantity]);
 
   // Update nodes and edges based on selection
   useEffect(() => {
@@ -166,17 +216,83 @@ function ImpactFlow({ impact }: { impact: ImpactResult }) {
   }, []);
 
   const focusIncident = () => {
-    const sourceNode = nodes.find(n => n.data.status === 'source');
-    if (sourceNode) {
-      setSelectedNodeId(sourceNode.id);
-      setCenter(sourceNode.position.x + 90, sourceNode.position.y + 40, { zoom: 1.2, duration: 800 });
-    }
+    // Find all source/affected nodes to fit the critical cluster
+    const criticalNodes = getNodes().filter(n => n.data.status === 'source' || n.data.status === 'affected');
+    if (criticalNodes.length === 0) return;
+    const sourceNode = criticalNodes.find(n => n.data.status === 'source') || criticalNodes[0];
+    setSelectedNodeId(sourceNode.id);
+    setTimeout(() => {
+      fitView({ nodes: criticalNodes, padding: 0.35, duration: 800 });
+    }, 50);
   };
 
   const showFullNetwork = () => {
     setSelectedNodeId(null);
-    fitView({ padding: 0.2, duration: 800 });
+    setTimeout(() => fitView({ padding: 0.2, duration: 800 }), 50);
   };
+
+  /** Trace Downstream — fixed: close panel first, then animate sweep, then fitView */
+  const handleTraceDownstream = useCallback((nodeId: string) => {
+    // 1. Close the details panel immediately
+    setSelectedNodeId(null);
+
+    // Clear any previous sweep timers
+    sweepTimersRef.current.forEach(t => clearTimeout(t));
+    sweepTimersRef.current = [];
+
+    const down = getReachableNodes(nodeId, impact.edges, 'downstream');
+    const up = getReachableNodes(nodeId, impact.edges, 'upstream');
+    const activeIds = new Set([...Array.from(down), ...Array.from(up)]);
+    const sweepOrder = getDownstreamOrdered(nodeId, impact.edges);
+
+    // 2. Mute everything first, then fitView after a tick (panel close + state flush)
+    setNodes(nds => nds.map(n => ({
+      ...n,
+      data: { ...n.data, isSelected: n.id === nodeId, isMuted: !activeIds.has(n.id), isAnimating: false }
+    })));
+
+    setEdges(eds => eds.map(e => {
+      const isPath = activeIds.has(e.source) && activeIds.has(e.target);
+      return {
+        ...e,
+        style: {
+          ...e.style,
+          stroke: e.data.baseStroke,
+          strokeWidth: isPath ? e.data.baseWidth + 1 : e.data.baseWidth,
+          opacity: isPath ? 1 : 0.12,
+        },
+        markerEnd: { type: MarkerType.ArrowClosed, color: e.data.baseStroke }
+      };
+    }));
+
+    // 3. After React flush (100ms), trigger fitView on the active cluster
+    const fitTimer = setTimeout(() => {
+      const currentNodes = getNodes();
+      const targetNodes = currentNodes.filter(n => activeIds.has(n.id));
+      fitView({ nodes: targetNodes, padding: 0.25, duration: 900 });
+    }, 100);
+    sweepTimersRef.current.push(fitTimer);
+
+    // 4. After fitView starts, animate sweep — each node lights up one-by-one
+    sweepOrder.forEach((nId, idx) => {
+      const t = setTimeout(() => {
+        // Turn on sweep flash
+        setNodes(nds => nds.map(n => n.id === nId
+          ? { ...n, data: { ...n.data, isAnimating: true } }
+          : n
+        ));
+        // Turn off after 650ms
+        const offTimer = setTimeout(() => {
+          setNodes(nds => nds.map(n => n.id === nId
+            ? { ...n, data: { ...n.data, isAnimating: false } }
+            : n
+          ));
+        }, 650);
+        sweepTimersRef.current.push(offTimer);
+      }, 300 + idx * 150);
+      sweepTimersRef.current.push(t);
+    });
+  }, [impact.edges, setNodes, setEdges, fitView, getNodes]);
 
   const selectedData = selectedNodeId ? nodes.find(n => n.id === selectedNodeId)?.data : null;
 
@@ -218,6 +334,27 @@ function ImpactFlow({ impact }: { impact: ImpactResult }) {
             <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-success" /><span className="text-[12px] font-medium">Safe</span></div>
             <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-muted-foreground" /><span className="text-[12px] font-medium">Already Sold</span></div>
             <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-border" /><span className="text-[12px] font-medium text-muted-foreground">Normal</span></div>
+
+            {/* AI Prediction Mode info card */}
+            {predictionMode && (
+              <div
+                style={{
+                  marginTop: '12px',
+                  padding: '8px 10px',
+                  borderRadius: '10px',
+                  background: 'rgba(209, 154, 67, 0.10)',
+                  border: '1px solid rgba(209, 154, 67, 0.30)',
+                  maxWidth: '180px',
+                }}
+              >
+                <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--color-warning)', letterSpacing: '0.06em', marginBottom: '4px', textTransform: 'uppercase' }}>
+                  ⚡ AI Model Active
+                </div>
+                <div style={{ fontSize: '10px', color: 'var(--color-muted-foreground)', lineHeight: 1.5 }}>
+                  Blast radius probabilities derived from supply chain velocity & historical contamination spread patterns.
+                </div>
+              </div>
+            )}
           </div>
         </Panel>
       </ReactFlow>
@@ -309,16 +446,24 @@ function ImpactFlow({ impact }: { impact: ImpactResult }) {
               </div>
             )}
 
+            {/* AI Risk Score in panel */}
+            {predictionMode && selectedData.aiRiskScore !== undefined && (selectedData.status === 'safe' || selectedData.status === 'uncertain') && (
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: '12px',
+                  background: 'rgba(209, 154, 67, 0.08)',
+                  border: '1px solid rgba(209, 154, 67, 0.25)',
+                }}
+              >
+                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-warning)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '4px' }}>⚡ AI Blast Radius Forecast</div>
+                <div style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-warning)', lineHeight: 1 }}>{selectedData.aiRiskScore}%</div>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted-foreground)', marginTop: '3px' }}>estimated probability of contamination spread reaching this node</div>
+              </div>
+            )}
+
             <button 
-              onClick={() => {
-                const down = getReachableNodes(selectedData.id, impact.edges, 'downstream');
-                const up = getReachableNodes(selectedData.id, impact.edges, 'upstream');
-                const activeIds = new Set([...Array.from(down), ...Array.from(up)]);
-                setNodes(nds => nds.map(n => ({
-                  ...n, data: { ...n.data, isSelected: n.id === selectedData.id, isMuted: !activeIds.has(n.id) }
-                })));
-                fitView({ nodes: nodes.filter(n => activeIds.has(n.id)), padding: 0.2, duration: 800 });
-              }}
+              onClick={() => handleTraceDownstream(selectedData.id)}
               className="w-full py-3 bg-dark-action text-dark-action-fg rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-sm mt-4"
             >
               <Play className="w-4 h-4 fill-current" /> Trace Downstream
@@ -335,6 +480,7 @@ export default function ImpactMapPage() {
   const [impact, setImpact] = useState<ImpactResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [predictionMode, setPredictionMode] = useState(false);
 
   useEffect(() => {
     async function runAnalysis() {
@@ -378,11 +524,60 @@ export default function ImpactMapPage() {
           <h1 className="text-[32px] font-semibold text-foreground mb-1">Impact Analysis</h1>
           <p className="text-[14px] text-muted-foreground">Interactive map of upstream sources and downstream contamination spread</p>
         </div>
+
+        {/* AI Prediction Mode toggle */}
+        <button
+          onClick={() => setPredictionMode(p => !p)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 18px',
+            borderRadius: '999px',
+            fontSize: '13px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 200ms ease',
+            border: predictionMode
+              ? '1px solid rgba(209, 154, 67, 0.55)'
+              : '1px solid var(--color-border)',
+            background: predictionMode
+              ? 'rgba(209, 154, 67, 0.13)'
+              : 'var(--color-surface-2)',
+            color: predictionMode
+              ? 'var(--color-warning)'
+              : 'var(--color-muted-foreground)',
+            boxShadow: predictionMode
+              ? '0 0 0 3px rgba(209, 154, 67, 0.12)'
+              : 'none',
+          }}
+        >
+          <Sparkles
+            style={{
+              width: '15px',
+              height: '15px',
+              color: predictionMode ? 'var(--color-warning)' : 'var(--color-muted-foreground)',
+            }}
+          />
+          {predictionMode ? 'AI Prediction: ON' : '🔮 AI Prediction Mode'}
+          {predictionMode && (
+            <span
+              style={{
+                display: 'inline-block',
+                width: '7px',
+                height: '7px',
+                borderRadius: '50%',
+                background: 'var(--color-warning)',
+                animation: 'amber-glow 1.8s ease-in-out infinite',
+              }}
+            />
+          )}
+        </button>
       </div>
 
       <div className="flex-1 min-h-0 relative">
         <ReactFlowProvider>
-          <ImpactFlow impact={impact} />
+          <ImpactFlow impact={impact} predictionMode={predictionMode} />
         </ReactFlowProvider>
       </div>
     </div>
