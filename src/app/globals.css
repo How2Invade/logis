@@ -71,6 +71,8 @@
 
 html {
   font-size: 16px;
+  height: 100%;
+  overflow: hidden;
 }
 
 body {
@@ -80,18 +82,13 @@ body {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  height: 100%;
+  overflow: hidden;
 }
 
 
 
 
-body {
-  font-family: var(--font-sans);
-  background: var(--color-background);
-  color: var(--color-foreground);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {

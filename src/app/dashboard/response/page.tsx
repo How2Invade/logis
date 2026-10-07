@@ -116,11 +116,11 @@ export default function ResponsePage() {
   const remainingHigh = actions.filter(a => a.priorityLevel === 'high' && !a.completed).length;
 
   if (!mounted) {
-    return <div className="px-8 lg:px-10 py-7 min-h-screen"></div>; // Wait for hydration
+    return <div className="px-8 lg:px-10 py-7 "></div>; // Wait for hydration
   }
 
   return (
-    <div className="px-8 lg:px-10 py-7 max-w-[1400px] mx-auto space-y-8 min-h-screen text-foreground transition-colors duration-300">
+    <div className="px-8 lg:px-10 py-7 max-w-[1400px] mx-auto space-y-8  text-foreground transition-colors duration-300">
       <div>
         <h1 className="text-[32px] font-semibold text-foreground mb-1">Response Plan</h1>
         <p className="text-[14px] text-muted-foreground">Actionable execution plan to mitigate the incident impact</p>

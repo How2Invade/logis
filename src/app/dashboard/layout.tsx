@@ -123,7 +123,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-auto bg-background transition-colors duration-300">
-        <main className="flex-1">
+        <main>
           {children}
         </main>
       </div>
