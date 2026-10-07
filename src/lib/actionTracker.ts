@@ -2,7 +2,7 @@ import type { ResponseAction } from '@/lib/types';
 
 /** Shared Action Tracker state — used by the Response page and by every report export. */
 
-export const ACTION_TRACKER_STORAGE_KEY = 'logis_response_actions';
+export const ACTION_TRACKER_STORAGE_KEY = 'logis_response_actions_v2';
 
 export const ACTION_OWNERS = ['Operations Manager', 'Quality Team', 'Warehouse Team', 'Logistics Team', 'Recall Coordinator'];
 
@@ -15,6 +15,7 @@ export type TrackedAction = ResponseAction & {
   dueTime?: string;
   isOverdue?: boolean;
   priorityLevel?: PriorityLevel;
+  agentStatus?: 'pending' | 'approved' | 'rejected';
 };
 
 export function priorityLevelFor(priority: number): PriorityLevel {
@@ -26,6 +27,7 @@ export function toTrackedActions(actions: ResponseAction[]): TrackedAction[] {
   return actions.map((a, i) => ({
     ...a,
     completed: false,
+    agentStatus: 'pending',
     owner: ACTION_OWNERS[i % ACTION_OWNERS.length],
     priorityLevel: priorityLevelFor(a.priority),
   }));

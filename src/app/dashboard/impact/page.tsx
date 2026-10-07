@@ -108,7 +108,7 @@ function layoutElements(gnodes: GNode[], gedges: GEdge[]) {
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        type: 'bezier',
+        type: 'default',
         animated: edge.confidence !== 'confirmed',
         style: {
           stroke: baseStroke,
@@ -216,13 +216,12 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
   }, []);
 
   const focusIncident = () => {
-    // Find all source/affected nodes to fit the critical cluster
     const criticalNodes = getNodes().filter(n => n.data.status === 'source' || n.data.status === 'affected');
     if (criticalNodes.length === 0) return;
     const sourceNode = criticalNodes.find(n => n.data.status === 'source') || criticalNodes[0];
     setSelectedNodeId(sourceNode.id);
     setTimeout(() => {
-      fitView({ nodes: criticalNodes, padding: 0.35, duration: 800 });
+      fitView({ nodes: [sourceNode], padding: 1.2, maxZoom: 1.5, duration: 800 });
     }, 50);
   };
 
@@ -240,59 +239,99 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
     sweepTimersRef.current.forEach(t => clearTimeout(t));
     sweepTimersRef.current = [];
 
+    // ONLY downstream nodes should be in the trace
     const down = getReachableNodes(nodeId, impact.edges, 'downstream');
-    const up = getReachableNodes(nodeId, impact.edges, 'upstream');
-    const activeIds = new Set([...Array.from(down), ...Array.from(up)]);
-    const sweepOrder = getDownstreamOrdered(nodeId, impact.edges);
+    const activeIds = down;
 
-    // 2. Mute everything first, then fitView after a tick (panel close + state flush)
+    // Build BFS layers for true propagation animation
+    const visited = new Set<string>([nodeId]);
+    let currentLayer = [nodeId];
+    const layers: string[][] = [currentLayer];
+
+    while (currentLayer.length > 0) {
+      const nextLayer: string[] = [];
+      for (const n of currentLayer) {
+        for (const edge of impact.edges) {
+          if (edge.source === n && !visited.has(edge.target)) {
+            visited.add(edge.target);
+            nextLayer.push(edge.target);
+          }
+        }
+      }
+      if (nextLayer.length > 0) {
+        layers.push(nextLayer);
+      }
+      currentLayer = nextLayer;
+    }
+
+    // 2. Setup initial state: Mute unrelated nodes/edges. Dim ALL edges initially so they can "light up".
     setNodes(nds => nds.map(n => ({
       ...n,
       data: { ...n.data, isSelected: n.id === nodeId, isMuted: !activeIds.has(n.id), isAnimating: false }
     })));
 
     setEdges(eds => eds.map(e => {
-      const isPath = activeIds.has(e.source) && activeIds.has(e.target);
       return {
         ...e,
+        animated: false,
         style: {
           ...e.style,
           stroke: e.data.baseStroke,
-          strokeWidth: isPath ? e.data.baseWidth + 1 : e.data.baseWidth,
-          opacity: isPath ? 1 : 0.12,
+          strokeWidth: e.data.baseWidth,
+          opacity: 0.05, // start practically invisible
+          transition: 'opacity 0.4s ease, stroke-width 0.4s ease'
         },
         markerEnd: { type: MarkerType.ArrowClosed, color: e.data.baseStroke }
       };
     }));
 
-    // 3. After React flush (100ms), trigger fitView on the active cluster
-    const fitTimer = setTimeout(() => {
-      const currentNodes = getNodes();
-      const targetNodes = currentNodes.filter(n => activeIds.has(n.id));
-      fitView({ nodes: targetNodes, padding: 0.25, duration: 900 });
-    }, 100);
-    sweepTimersRef.current.push(fitTimer);
-
-    // 4. After fitView starts, animate sweep — each node lights up one-by-one
-    sweepOrder.forEach((nId, idx) => {
-      const t = setTimeout(() => {
-        // Turn on sweep flash
-        setNodes(nds => nds.map(n => n.id === nId
-          ? { ...n, data: { ...n.data, isAnimating: true } }
-          : n
-        ));
-        // Turn off after 650ms
-        const offTimer = setTimeout(() => {
-          setNodes(nds => nds.map(n => n.id === nId
-            ? { ...n, data: { ...n.data, isAnimating: false } }
-            : n
+    // 3. Wait briefly for the details panel to close (250ms), then start propagation
+    const startTimer = setTimeout(() => {
+      layers.forEach((layerNodes, layerIdx) => {
+        const t = setTimeout(() => {
+          
+          // Activate nodes in current layer
+          setNodes(nds => nds.map(n => 
+            layerNodes.includes(n.id) 
+              ? { ...n, data: { ...n.data, isAnimating: true } }
+              : n
           ));
-        }, 650);
-        sweepTimersRef.current.push(offTimer);
-      }, 300 + idx * 150);
-      sweepTimersRef.current.push(t);
-    });
-  }, [impact.edges, setNodes, setEdges, fitView, getNodes]);
+
+          // Activate edges flowing OUT from this layer to propagate the signal
+          setEdges(eds => eds.map(e => {
+            if (layerNodes.includes(e.source) && activeIds.has(e.target)) {
+              return {
+                ...e,
+                animated: true,
+                style: {
+                  ...e.style,
+                  strokeWidth: e.data.baseWidth + 1.5,
+                  opacity: 1, // Edge lights up
+                  transition: 'opacity 0.4s ease, stroke-width 0.4s ease'
+                }
+              };
+            }
+            return e;
+          }));
+
+          // Turn off the node pulse after a short duration
+          const offTimer = setTimeout(() => {
+            setNodes(nds => nds.map(n => 
+              layerNodes.includes(n.id)
+                ? { ...n, data: { ...n.data, isAnimating: false } }
+                : n
+            ));
+          }, 750);
+          sweepTimersRef.current.push(offTimer);
+
+        }, layerIdx * 650); // 650ms allows the edge signal to "travel" before next nodes light up
+        sweepTimersRef.current.push(t);
+      });
+    }, 250);
+    
+    sweepTimersRef.current.push(startTimer);
+
+  }, [impact.edges, setNodes, setEdges]);
 
   const selectedData = selectedNodeId ? nodes.find(n => n.id === selectedNodeId)?.data : null;
 
@@ -323,7 +362,7 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
           </button>
         </Panel>
 
-        <Controls showInteractive={false} className="!bg-surface !border-border !rounded-lg !shadow-sm !overflow-hidden" />
+        <Controls position="bottom-right" showInteractive={false} className="!bg-surface !border-border !rounded-lg !shadow-sm !overflow-hidden" />
 
         {/* Legend */}
         <Panel position="top-left" className="mt-4 ml-4">
@@ -559,7 +598,7 @@ export default function ImpactMapPage() {
               color: predictionMode ? 'var(--color-warning)' : 'var(--color-muted-foreground)',
             }}
           />
-          {predictionMode ? 'AI Prediction: ON' : '🔮 AI Prediction Mode'}
+          {predictionMode ? 'AI Prediction: ON' : 'AI Prediction Mode'}
           {predictionMode && (
             <span
               style={{

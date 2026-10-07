@@ -180,3 +180,16 @@ body {
   animation: node-sweep 0.6s ease-out forwards;
 }
 
+
+/* ReactFlow Controls Fix */
+.react-flow__controls-button {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-foreground) !important;
+}
+.react-flow__controls-button svg {
+  fill: var(--color-foreground) !important;
+}
+.react-flow__controls-button:hover {
+  background-color: var(--color-surface-2) !important;
+}
