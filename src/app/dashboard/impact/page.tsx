@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { ReactFlow, Background, Controls, MiniMap, Panel, useNodesState, useEdgesState, MarkerType, useReactFlow, ReactFlowProvider } from '@xyflow/react';
+import { ReactFlow, Background, Controls, MiniMap, Panel, useNodesState, useEdgesState, MarkerType, useReactFlow, ReactFlowProvider, getNodesBounds } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
 import { cn, formatNumber } from '@/lib/utils';
 import type { ImpactResult, GraphNode as GNode, GraphEdge as GEdge } from '@/lib/types';
-import { X, AlertTriangle, Crosshair, Map as MapIcon, Play, Sparkles } from 'lucide-react';
+import { X, AlertTriangle, Crosshair, Map as MapIcon, Play, Sparkles, Download, Camera } from 'lucide-react';
+import { toPng } from 'html-to-image';
+import { jsPDF } from 'jspdf';
 import { ImpactNode } from './components/ImpactNode';
 
 const nodeTypes = {
@@ -143,6 +145,8 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
   const [nodes, setNodes, onNodesChange] = useNodesState<any>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<any>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [traceProgress, setTraceProgress] = useState<number | null>(null);
+  const [activeTraceNodeId, setActiveTraceNodeId] = useState<string | null>(null);
   const { fitView, setCenter, getNodes } = useReactFlow();
   const sweepTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -230,39 +234,47 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
     setTimeout(() => fitView({ padding: 0.2, duration: 800 }), 50);
   };
 
-  /** Trace Downstream — fixed: close panel first, then animate sweep, then fitView */
   const handleTraceDownstream = useCallback((nodeId: string) => {
     // 1. Close the details panel immediately
     setSelectedNodeId(null);
+    setTraceProgress(0);
+    setActiveTraceNodeId(null);
 
     // Clear any previous sweep timers
     sweepTimersRef.current.forEach(t => clearTimeout(t));
     sweepTimersRef.current = [];
 
-    // ONLY downstream nodes should be in the trace
-    const down = getReachableNodes(nodeId, impact.edges, 'downstream');
-    const activeIds = down;
+    // Prioritize which path to take downstream
+    const path: string[] = [nodeId];
+    let current = nodeId;
+    const nodeStatusPriority: Record<string, number> = {
+       'source': 4,
+       'affected': 3,
+       'uncertain': 2,
+       'safe': 1,
+       'sold': 0,
+       'not_relevant': -1
+    };
 
-    // Build BFS layers for true propagation animation
-    const visited = new Set<string>([nodeId]);
-    let currentLayer = [nodeId];
-    const layers: string[][] = [currentLayer];
+    while (true) {
+      const outEdges = impact.edges.filter(e => e.source === current);
+      if (outEdges.length === 0) break;
 
-    while (currentLayer.length > 0) {
-      const nextLayer: string[] = [];
-      for (const n of currentLayer) {
-        for (const edge of impact.edges) {
-          if (edge.source === n && !visited.has(edge.target)) {
-            visited.add(edge.target);
-            nextLayer.push(edge.target);
-          }
-        }
-      }
-      if (nextLayer.length > 0) {
-        layers.push(nextLayer);
-      }
-      currentLayer = nextLayer;
+      const targets = outEdges.map(e => {
+        const node = impact.nodes.find(n => n.id === e.target);
+        return {
+           id: e.target,
+           priority: node ? (nodeStatusPriority[node.status] ?? 0) : 0
+        };
+      }).sort((a, b) => b.priority - a.priority);
+
+      const nextId = targets[0].id;
+      if (path.includes(nextId)) break; // Prevent cycle
+      path.push(nextId);
+      current = nextId;
     }
+
+    const activeIds = new Set(path);
 
     // 2. Setup initial state: Mute unrelated nodes/edges. Dim ALL edges initially so they can "light up".
     setNodes(nds => nds.map(n => ({
@@ -271,6 +283,7 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
     })));
 
     setEdges(eds => eds.map(e => {
+      const isPathEdge = path.includes(e.source) && path.includes(e.target) && path.indexOf(e.target) === path.indexOf(e.source) + 1;
       return {
         ...e,
         animated: false,
@@ -278,7 +291,7 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
           ...e.style,
           stroke: e.data.baseStroke,
           strokeWidth: e.data.baseWidth,
-          opacity: 0.05, // start practically invisible
+          opacity: isPathEdge ? 0.05 : 0.01,
           transition: 'opacity 0.4s ease, stroke-width 0.4s ease'
         },
         markerEnd: { type: MarkerType.ArrowClosed, color: e.data.baseStroke }
@@ -287,53 +300,119 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
 
     // 3. Wait briefly for the details panel to close (250ms), then start propagation
     const startTimer = setTimeout(() => {
-      layers.forEach((layerNodes, layerIdx) => {
+      const totalSteps = path.length;
+
+      path.forEach((currNodeId, idx) => {
         const t = setTimeout(() => {
           
-          // Activate nodes in current layer
+          setTraceProgress(Math.round(((idx + 1) / totalSteps) * 100));
+          setActiveTraceNodeId(currNodeId);
+
+          const nodeObj = getNodes().find(n => n.id === currNodeId);
+          if (nodeObj) {
+            fitView({ nodes: [nodeObj], padding: 1.2, duration: 800, maxZoom: 1.5 });
+          }
+
+          // Activate node
           setNodes(nds => nds.map(n => 
-            layerNodes.includes(n.id) 
+            n.id === currNodeId
               ? { ...n, data: { ...n.data, isAnimating: true } }
               : n
           ));
 
-          // Activate edges flowing OUT from this layer to propagate the signal
-          setEdges(eds => eds.map(e => {
-            if (layerNodes.includes(e.source) && activeIds.has(e.target)) {
-              return {
-                ...e,
-                animated: true,
-                style: {
-                  ...e.style,
-                  strokeWidth: e.data.baseWidth + 1.5,
-                  opacity: 1, // Edge lights up
-                  transition: 'opacity 0.4s ease, stroke-width 0.4s ease'
-                }
-              };
-            }
-            return e;
-          }));
+          // Activate edge to next node
+          if (idx < totalSteps - 1) {
+            const nextNodeId = path[idx + 1];
+            setEdges(eds => eds.map(e => {
+              if (e.source === currNodeId && e.target === nextNodeId) {
+                return {
+                  ...e,
+                  animated: true,
+                  style: {
+                    ...e.style,
+                    strokeWidth: e.data.baseWidth + 1.5,
+                    opacity: 1, // Edge lights up
+                    transition: 'opacity 0.4s ease, stroke-width 0.4s ease'
+                  }
+                };
+              }
+              return e;
+            }));
+          }
 
           // Turn off the node pulse after a short duration
           const offTimer = setTimeout(() => {
             setNodes(nds => nds.map(n => 
-              layerNodes.includes(n.id)
+              n.id === currNodeId
                 ? { ...n, data: { ...n.data, isAnimating: false } }
                 : n
             ));
-          }, 750);
+          }, 1000);
           sweepTimersRef.current.push(offTimer);
 
-        }, layerIdx * 650); // 650ms allows the edge signal to "travel" before next nodes light up
+          // Finish trace
+          if (idx === totalSteps - 1) {
+            const endTimer = setTimeout(() => {
+              setTraceProgress(null);
+              setActiveTraceNodeId(null);
+              // Zoom out slightly to show just the traced path
+              const pathNodes = getNodes().filter(n => activeIds.has(n.id));
+              if (pathNodes.length > 0) {
+                fitView({ nodes: pathNodes, padding: 0.3, duration: 800 });
+              }
+            }, 1500);
+            sweepTimersRef.current.push(endTimer);
+          }
+
+        }, idx * 1200); // 1.2s delay between steps for smooth zooming
         sweepTimersRef.current.push(t);
       });
     }, 250);
     
     sweepTimersRef.current.push(startTimer);
 
-  }, [impact.edges, setNodes, setEdges]);
+  }, [impact.edges, impact.nodes, setNodes, setEdges, getNodes, fitView]);
+
+  const handleSnapshot = async () => {
+    const reactFlowWrapper = document.querySelector('.react-flow') as HTMLElement;
+    if (!reactFlowWrapper) return;
+
+    const width = reactFlowWrapper.offsetWidth;
+    const height = reactFlowWrapper.offsetHeight;
+
+    try {
+      const dataUrl = await toPng(reactFlowWrapper, { 
+        backgroundColor: '#09090b',
+        filter: (node) => {
+          // Only exclude the bottom-left controls and the default ReactFlow controls
+          // This keeps the Legend and Stats in the snapshot!
+          if (node.id === 'controls-panel' || node.classList?.contains('react-flow__controls')) {
+            return false;
+          }
+          return true;
+        }
+      });
+
+      const pdf = new jsPDF({
+        orientation: width > height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [width, height],
+      });
+      
+      pdf.addImage(dataUrl, 'PNG', 0, 0, width, height);
+      
+      pdf.setFontSize(16);
+      pdf.setTextColor('#aaaaaa');
+      pdf.text(`Impact Map Snapshot - ${new Date().toLocaleString()}`, 24, 32);
+      
+      pdf.save('impact-map-snapshot.pdf');
+    } catch (err) {
+      console.error('Failed to capture snapshot:', err);
+    }
+  };
 
   const selectedData = selectedNodeId ? nodes.find(n => n.id === selectedNodeId)?.data : null;
+  const activeTraceData = activeTraceNodeId ? impact.nodes.find(n => n.id === activeTraceNodeId) : null;
 
   return (
     <div className="w-full h-full flex relative rounded-2xl border border-border bg-surface overflow-hidden shadow-sm">
@@ -353,12 +432,15 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
         <Background color="var(--color-muted-foreground)" gap={20} size={1} className="opacity-20" />
         
         {/* Controls Overlay */}
-        <Panel position="bottom-left" className="mb-4 ml-4 flex gap-2">
+        <Panel id="controls-panel" position="bottom-left" className="mb-4 ml-4 flex gap-2">
           <button onClick={focusIncident} className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface-2 border border-border text-[13px] font-semibold text-foreground hover:bg-surface shadow-sm transition-colors">
             <Crosshair className="w-4 h-4 text-critical" /> Focus Incident
           </button>
           <button onClick={showFullNetwork} className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface-2 border border-border text-[13px] font-semibold text-foreground hover:bg-surface shadow-sm transition-colors">
             <MapIcon className="w-4 h-4 text-muted-foreground" /> Full Network
+          </button>
+          <button onClick={handleSnapshot} className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface-2 border border-border text-[13px] font-semibold text-foreground hover:bg-surface shadow-sm transition-colors">
+            <Camera className="w-4 h-4 text-muted-foreground" /> Snapshot
           </button>
         </Panel>
 
@@ -394,9 +476,57 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
                 </div>
               </div>
             )}
+
+            {/* Live Trace Update */}
+            {activeTraceData && (
+              <div
+                className="animate-in fade-in slide-in-from-top-2 duration-300"
+                style={{
+                  marginTop: '12px',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  background: 'var(--color-surface-2)',
+                  border: '1px solid var(--color-border)',
+                  maxWidth: '220px',
+                }}
+              >
+                <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-foreground)', letterSpacing: '0.05em', marginBottom: '8px', textTransform: 'uppercase' }}>
+                  Live Trace
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-foreground)', marginBottom: '4px' }}>
+                  {activeTraceData.label}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--color-muted-foreground)', marginBottom: '8px', textTransform: 'capitalize' }}>
+                  {activeTraceData.type}
+                </div>
+                {activeTraceData.quantity && (
+                  <div style={{ fontSize: '11px', color: 'var(--color-muted-foreground)' }}>
+                    <span className="font-semibold text-foreground">{formatNumber(activeTraceData.quantity)}</span> units affected
+                  </div>
+                )}
+                {activeTraceData.reason && (
+                  <div style={{ fontSize: '11px', color: 'var(--color-muted-foreground)', marginTop: '8px', lineHeight: 1.4 }} className="line-clamp-2">
+                    {activeTraceData.reason}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </Panel>
       </ReactFlow>
+
+      {/* Trace Progress Bar */}
+      {traceProgress !== null && (
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-50 w-64 bg-surface/90 backdrop-blur-md rounded-full border border-border p-3 shadow-lg flex flex-col gap-2 items-center animate-in fade-in slide-in-from-top-4">
+          <div className="text-[11px] font-bold text-foreground uppercase tracking-wider">Tracing Downstream... {traceProgress}%</div>
+          <div className="w-full h-1.5 bg-surface-2 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-critical transition-all duration-300 ease-out" 
+              style={{ width: `${traceProgress}%` }} 
+            />
+          </div>
+        </div>
+      )}
 
       {/* Stats overlay (Top Right) */}
       <div className="absolute top-4 right-4 z-10 flex gap-3 pointer-events-none">

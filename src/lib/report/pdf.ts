@@ -1189,7 +1189,7 @@ function page6(r: R, d: ReportData) {
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
-export async function generateLogisPDF(data: ReportData, filename: string): Promise<void> {
+export async function generateLogisPDF(data: ReportData, filename: string, reportType: 'comprehensive' | 'impact' | 'recovery' = 'comprehensive'): Promise<void> {
   const mod: any = await import('jspdf');
   const JsPDF = mod.jsPDF || mod.default;
   const doc = new JsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
@@ -1220,12 +1220,29 @@ export async function generateLogisPDF(data: ReportData, filename: string): Prom
   });
 
   const r = new R(doc, family, unicode);
-  const pages = [page1, page2, page3, page4, page5, page6];
+  
+  let pages = [page1, page2, page3, page4, page5, page6];
+  if (reportType === 'impact') {
+    pages = [page1, page2];
+  } else if (reportType === 'recovery') {
+    pages = [page1, page3, page4, page5];
+  }
+
+  const totalPagesToRender = pages.length;
+
   pages.forEach((draw, idx) => {
     if (idx > 0) doc.addPage('a4', 'portrait');
     if (idx > 0) header(r, data);
     draw(r, data);
-    footer(r, data, idx + 1);
+    
+    // Custom footer with correct total pages
+    const y = 297 - 9;
+    r.line(18, 297 - 14, 210 - 18, 297 - 14, C.border, 0.3);
+    r.label('Synthetic Demonstration Data', 18, y, C.neutral, 6);
+    r.font('normal', 6.5, C.neutral);
+    r.text(`Generated ${fmtDateTime(data.generatedAt)}`, 210 / 2, y, { align: 'center' });
+    r.font('bold', 6.8, C.ink);
+    r.text(`Page ${idx + 1} of ${totalPagesToRender}`, 210 - 18, y, { align: 'right' });
   });
 
   doc.save(filename);

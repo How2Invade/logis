@@ -82,7 +82,7 @@ export default function ReportsPage() {
     
     try {
       const data = await generateData();
-      await generateLogisPDF(data, `${reportFileBase(data)}.pdf`);
+      await generateLogisPDF(data, `${reportFileBase(data)}.pdf`, reportType);
       toast.success('Report downloaded successfully!', { id: 'export' });
     } catch (error: any) {
       console.error('Failed to export PDF:', error);
@@ -292,42 +292,44 @@ export default function ReportsPage() {
                   </div>
 
                   {/* Impact by Facility & Product */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                    <div>
-                      <h2 className="text-[16px] font-semibold border-b border-border pb-2 mb-6">2. Impact by Facility</h2>
-                      <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={facilityData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
-                            <XAxis dataKey="name" tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                            <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '8px' }} itemStyle={{ color: 'var(--color-foreground)' }} />
-                            <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', color: 'var(--color-muted-foreground)' }} />
-                            <Bar dataKey="affected" name="Affected" stackId="a" fill="var(--color-critical)" barSize={24} />
-                            <Bar dataKey="safe" name="Safe" stackId="a" fill="var(--color-success)" barSize={24} />
-                          </BarChart>
-                        </ResponsiveContainer>
+                  {(reportType === 'comprehensive' || reportType === 'impact') && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                      <div>
+                        <h2 className="text-[16px] font-semibold border-b border-border pb-2 mb-6">2. Impact by Facility</h2>
+                        <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={facilityData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+                              <XAxis dataKey="name" tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                              <YAxis tick={{ fill: 'var(--color-muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                              <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '8px' }} itemStyle={{ color: 'var(--color-foreground)' }} />
+                              <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', color: 'var(--color-muted-foreground)' }} />
+                              <Bar dataKey="affected" name="Affected" stackId="a" fill="var(--color-critical)" barSize={24} />
+                              <Bar dataKey="safe" name="Safe" stackId="a" fill="var(--color-success)" barSize={24} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h2 className="text-[16px] font-semibold border-b border-border pb-2 mb-6">3. Affected Units by Product</h2>
+                        <div className="h-64 flex items-center justify-center">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={productData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value" stroke="none">
+                                {productData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                              </Pie>
+                              <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '8px' }} />
+                              <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', color: 'var(--color-muted-foreground)' }} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
                     </div>
-                    
-                    <div>
-                      <h2 className="text-[16px] font-semibold border-b border-border pb-2 mb-6">3. Affected Units by Product</h2>
-                      <div className="h-64 flex items-center justify-center">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie data={productData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} dataKey="value" stroke="none">
-                              {productData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                            </Pie>
-                            <Tooltip contentStyle={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)', borderRadius: '8px' }} />
-                            <Legend iconType="circle" wrapperStyle={{ fontSize: '11px', color: 'var(--color-muted-foreground)' }} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  </div>
+                  )}
 
                   {/* Response Cost Comparison */}
-                  {responseStats && (
+                  {responseStats && (reportType === 'comprehensive' || reportType === 'recovery') && (
                     <div>
                       <h2 className="text-[16px] font-semibold border-b border-border pb-2 mb-6">4. Response Cost Comparison</h2>
                       <div className="h-64 max-w-lg">
@@ -352,35 +354,37 @@ export default function ReportsPage() {
                   )}
 
                   {/* Operational Details Table */}
-                  <div className="print:break-before-page">
-                    <h2 className="text-[16px] font-semibold border-b border-border pb-2 mb-6">5. Critical Action Areas</h2>
-                    <table className="w-full text-left text-[13px]">
-                      <thead>
-                        <tr className="border-b border-border text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-                          <th className="pb-3 px-2">Location</th>
-                          <th className="pb-3 px-2">Status</th>
-                          <th className="pb-3 px-2 text-right">Affected Units</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        <tr className="bg-surface-2/30">
-                          <td className="py-3 px-2 font-medium">WH-001 (Central)</td>
-                          <td className="py-3 px-2"><span className="text-critical font-semibold">Critical Impact</span></td>
-                          <td className="py-3 px-2 text-right tabular-nums">1,200</td>
-                        </tr>
-                        <tr>
-                          <td className="py-3 px-2 font-medium">WH-002 (North)</td>
-                          <td className="py-3 px-2"><span className="text-critical font-semibold">Critical Impact</span></td>
-                          <td className="py-3 px-2 text-right tabular-nums">450</td>
-                        </tr>
-                        <tr className="bg-surface-2/30">
-                          <td className="py-3 px-2 font-medium">ST-042 (Metro)</td>
-                          <td className="py-3 px-2"><span className="text-warning font-semibold">Needs Verification</span></td>
-                          <td className="py-3 px-2 text-right tabular-nums">340</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                  {(reportType === 'comprehensive' || reportType === 'impact') && (
+                    <div className="print:break-before-page">
+                      <h2 className="text-[16px] font-semibold border-b border-border pb-2 mb-6">5. Critical Action Areas</h2>
+                      <table className="w-full text-left text-[13px]">
+                        <thead>
+                          <tr className="border-b border-border text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+                            <th className="pb-3 px-2">Location</th>
+                            <th className="pb-3 px-2">Status</th>
+                            <th className="pb-3 px-2 text-right">Affected Units</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          <tr className="bg-surface-2/30">
+                            <td className="py-3 px-2 font-medium">WH-001 (Central)</td>
+                            <td className="py-3 px-2"><span className="text-critical font-semibold">Critical Impact</span></td>
+                            <td className="py-3 px-2 text-right tabular-nums">1,200</td>
+                          </tr>
+                          <tr>
+                            <td className="py-3 px-2 font-medium">WH-002 (North)</td>
+                            <td className="py-3 px-2"><span className="text-critical font-semibold">Critical Impact</span></td>
+                            <td className="py-3 px-2 text-right tabular-nums">450</td>
+                          </tr>
+                          <tr className="bg-surface-2/30">
+                            <td className="py-3 px-2 font-medium">ST-042 (Metro)</td>
+                            <td className="py-3 px-2"><span className="text-warning font-semibold">Needs Verification</span></td>
+                            <td className="py-3 px-2 text-right tabular-nums">340</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
 
                 </>
               ) : null}

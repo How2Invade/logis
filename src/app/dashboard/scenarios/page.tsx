@@ -38,10 +38,36 @@ export default function ScenariosPage() {
     setLoading(false);
   }
 
-  const chartData = result ? [
-    { name: 'Affected Units', Baseline: result.baseline.impact.affectedUnits, Scenario: result.scenario.impact.affectedUnits },
-    { name: 'Response Cost (k)', Baseline: result.baseline.response.comparison.logis.totalCost / 1000, Scenario: result.scenario.response.comparison.logis.totalCost / 1000 }
-  ] : [];
+  const chartData = (() => {
+    if (!result) return [];
+    switch (activePreset) {
+      case 'additional_batch':
+        return [
+          { name: 'Affected Units', Baseline: result.baseline.impact.affectedUnits, Scenario: result.scenario.impact.affectedUnits },
+          { name: 'Response Cost (k)', Baseline: result.baseline.response.comparison.logis.totalCost / 1000, Scenario: result.scenario.response.comparison.logis.totalCost / 1000 }
+        ];
+      case 'warehouse_unavailable':
+        return [
+          { name: 'Recovery Value (k)', Baseline: result.baseline.recovery.potentialRecoveryValue / 1000, Scenario: result.scenario.recovery.potentialRecoveryValue / 1000 },
+          { name: 'Allocations', Baseline: result.baseline.recovery.allocations.length, Scenario: result.scenario.recovery.allocations.length }
+        ];
+      case 'transport_reduced':
+        return [
+          { name: 'Available Trucks', Baseline: result.baseline.recovery.idleResources.filter(r => r.type === 'truck').length, Scenario: result.scenario.recovery.idleResources.filter(r => r.type === 'truck').length },
+          { name: 'Recovery Time (h)', Baseline: result.baseline.recovery.estimatedRecoveryTimeHours, Scenario: result.scenario.recovery.estimatedRecoveryTimeHours }
+        ];
+      case 'demand_spike': {
+        const baseDemandGap = result.baseline.recovery.unmetDemand.reduce((s, d) => s + d.gap, 0);
+        const scenDemandGap = result.scenario.recovery.unmetDemand.reduce((s, d) => s + d.gap, 0);
+        return [
+          { name: 'Unmet Demand', Baseline: baseDemandGap, Scenario: scenDemandGap },
+          { name: 'Recovery Value (k)', Baseline: result.baseline.recovery.potentialRecoveryValue / 1000, Scenario: result.scenario.recovery.potentialRecoveryValue / 1000 }
+        ];
+      }
+      default:
+        return [];
+    }
+  })();
 
   return (
     <div className="px-8 lg:px-10 py-7 max-w-[1400px] mx-auto min-h-screen bg-background text-foreground transition-colors duration-300 space-y-10">
@@ -85,10 +111,50 @@ export default function ScenariosPage() {
         <div className="space-y-6">
           {/* Delta Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <DeltaCard label="Affected Units" baseline={result.baseline.impact.affectedUnits} scenario={result.scenario.impact.affectedUnits} delta={result.delta.affectedUnits} />
-            <DeltaCard label="Safe Units" baseline={result.baseline.impact.safeUnits} scenario={result.scenario.impact.safeUnits} delta={result.delta.safeUnits} inverted />
-            <DeltaCard label="Response Cost" baseline={result.baseline.response.comparison.logis.totalCost} scenario={result.scenario.response.comparison.logis.totalCost} delta={result.delta.costDelta} isCurrency />
-            <DeltaCard label="Response Time" baseline={result.baseline.response.comparison.logis.estimatedTimeHours} scenario={result.scenario.response.comparison.logis.estimatedTimeHours} delta={result.delta.timeDelta} unit="h" />
+            {activePreset === 'additional_batch' && (
+              <>
+                <DeltaCard label="Affected Units" baseline={result.baseline.impact.affectedUnits} scenario={result.scenario.impact.affectedUnits} delta={result.scenario.impact.affectedUnits - result.baseline.impact.affectedUnits} />
+                <DeltaCard label="Safe Units" baseline={result.baseline.impact.safeUnits} scenario={result.scenario.impact.safeUnits} delta={result.scenario.impact.safeUnits - result.baseline.impact.safeUnits} inverted />
+                <DeltaCard label="Response Cost" baseline={result.baseline.response.comparison.logis.totalCost} scenario={result.scenario.response.comparison.logis.totalCost} delta={result.scenario.response.comparison.logis.totalCost - result.baseline.response.comparison.logis.totalCost} isCurrency />
+                <DeltaCard label="Response Time" baseline={result.baseline.response.comparison.logis.estimatedTimeHours} scenario={result.scenario.response.comparison.logis.estimatedTimeHours} delta={result.scenario.response.comparison.logis.estimatedTimeHours - result.baseline.response.comparison.logis.estimatedTimeHours} unit="h" />
+              </>
+            )}
+            
+            {activePreset === 'warehouse_unavailable' && (
+              <>
+                <DeltaCard label="Free Slots" 
+                  baseline={result.baseline.recovery.idleResources.filter(r => r.type === 'warehouse_slot').reduce((s, r) => s + (r.capacity || 0), 0)} 
+                  scenario={result.scenario.recovery.idleResources.filter(r => r.type === 'warehouse_slot').reduce((s, r) => s + (r.capacity || 0), 0)} 
+                  delta={result.scenario.recovery.idleResources.filter(r => r.type === 'warehouse_slot').reduce((s, r) => s + (r.capacity || 0), 0) - result.baseline.recovery.idleResources.filter(r => r.type === 'warehouse_slot').reduce((s, r) => s + (r.capacity || 0), 0)} />
+                <DeltaCard label="Allocations" baseline={result.baseline.recovery.allocations.length} scenario={result.scenario.recovery.allocations.length} delta={result.scenario.recovery.allocations.length - result.baseline.recovery.allocations.length} inverted />
+                <DeltaCard label="Recovery Value" baseline={result.baseline.recovery.potentialRecoveryValue} scenario={result.scenario.recovery.potentialRecoveryValue} delta={result.scenario.recovery.potentialRecoveryValue - result.baseline.recovery.potentialRecoveryValue} isCurrency inverted />
+                <DeltaCard label="Recovery Time" baseline={result.baseline.recovery.estimatedRecoveryTimeHours} scenario={result.scenario.recovery.estimatedRecoveryTimeHours} delta={result.scenario.recovery.estimatedRecoveryTimeHours - result.baseline.recovery.estimatedRecoveryTimeHours} unit="h" />
+              </>
+            )}
+
+            {activePreset === 'transport_reduced' && (
+              <>
+                <DeltaCard label="Available Trucks" 
+                  baseline={result.baseline.recovery.idleResources.filter(r => r.type === 'truck').length} 
+                  scenario={result.scenario.recovery.idleResources.filter(r => r.type === 'truck').length} 
+                  delta={result.scenario.recovery.idleResources.filter(r => r.type === 'truck').length - result.baseline.recovery.idleResources.filter(r => r.type === 'truck').length} />
+                <DeltaCard label="Recovery Time" baseline={result.baseline.recovery.estimatedRecoveryTimeHours} scenario={result.scenario.recovery.estimatedRecoveryTimeHours} delta={result.scenario.recovery.estimatedRecoveryTimeHours - result.baseline.recovery.estimatedRecoveryTimeHours} unit="h" />
+                <DeltaCard label="Allocations" baseline={result.baseline.recovery.allocations.length} scenario={result.scenario.recovery.allocations.length} delta={result.scenario.recovery.allocations.length - result.baseline.recovery.allocations.length} inverted />
+                <DeltaCard label="Recovery Value" baseline={result.baseline.recovery.potentialRecoveryValue} scenario={result.scenario.recovery.potentialRecoveryValue} delta={result.scenario.recovery.potentialRecoveryValue - result.baseline.recovery.potentialRecoveryValue} isCurrency inverted />
+              </>
+            )}
+
+            {activePreset === 'demand_spike' && (
+              <>
+                <DeltaCard label="Unmet Demand" 
+                  baseline={result.baseline.recovery.unmetDemand.reduce((s, d) => s + d.gap, 0)} 
+                  scenario={result.scenario.recovery.unmetDemand.reduce((s, d) => s + d.gap, 0)} 
+                  delta={result.scenario.recovery.unmetDemand.reduce((s, d) => s + d.gap, 0) - result.baseline.recovery.unmetDemand.reduce((s, d) => s + d.gap, 0)} />
+                <DeltaCard label="Allocations" baseline={result.baseline.recovery.allocations.length} scenario={result.scenario.recovery.allocations.length} delta={result.scenario.recovery.allocations.length - result.baseline.recovery.allocations.length} inverted />
+                <DeltaCard label="Recovery Value" baseline={result.baseline.recovery.potentialRecoveryValue} scenario={result.scenario.recovery.potentialRecoveryValue} delta={result.scenario.recovery.potentialRecoveryValue - result.baseline.recovery.potentialRecoveryValue} isCurrency inverted />
+                <DeltaCard label="Recovery Cost" baseline={result.baseline.recovery.estimatedCost} scenario={result.scenario.recovery.estimatedCost} delta={result.scenario.recovery.estimatedCost - result.baseline.recovery.estimatedCost} isCurrency />
+              </>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-6 items-start">
@@ -129,12 +195,12 @@ export default function ScenariosPage() {
                   <tbody className="divide-y divide-border bg-surface">
                     <CompRow label="Affected Units" b={result.baseline.impact.affectedUnits} s={result.scenario.impact.affectedUnits} />
                     <CompRow label="Safe Units" b={result.baseline.impact.safeUnits} s={result.scenario.impact.safeUnits} inverted />
-                    <CompRow label="Uncertain Units" b={result.baseline.impact.uncertainUnits} s={result.scenario.impact.uncertainUnits} />
-                    <CompRow label="Sold Units" b={result.baseline.impact.soldUnits} s={result.scenario.impact.soldUnits} />
-                    <CompRow label="Response Actions" b={result.baseline.response.actions.length} s={result.scenario.response.actions.length} />
                     <CompRow label="Response Cost" b={result.baseline.response.comparison.logis.totalCost} s={result.scenario.response.comparison.logis.totalCost} isCurrency />
-                    <CompRow label="Recovery Allocations" b={result.baseline.recovery.allocations.length} s={result.scenario.recovery.allocations.length} />
-                    <CompRow label="Recovery Value" b={result.baseline.recovery.potentialRecoveryValue} s={result.scenario.recovery.potentialRecoveryValue} isCurrency />
+                    <CompRow label="Available Trucks" b={result.baseline.recovery.idleResources.filter(r => r.type === 'truck').length} s={result.scenario.recovery.idleResources.filter(r => r.type === 'truck').length} inverted />
+                    <CompRow label="Free WH Slots" b={result.baseline.recovery.idleResources.filter(r => r.type === 'warehouse_slot').reduce((s, r) => s + (r.capacity || 0), 0)} s={result.scenario.recovery.idleResources.filter(r => r.type === 'warehouse_slot').reduce((s, r) => s + (r.capacity || 0), 0)} inverted />
+                    <CompRow label="Unmet Demand Gap" b={result.baseline.recovery.unmetDemand.reduce((s, d) => s + d.gap, 0)} s={result.scenario.recovery.unmetDemand.reduce((s, d) => s + d.gap, 0)} />
+                    <CompRow label="Recovery Allocations" b={result.baseline.recovery.allocations.length} s={result.scenario.recovery.allocations.length} inverted />
+                    <CompRow label="Recovery Value" b={result.baseline.recovery.potentialRecoveryValue} s={result.scenario.recovery.potentialRecoveryValue} isCurrency inverted />
                   </tbody>
                 </table>
               </div>
