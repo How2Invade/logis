@@ -71,8 +71,6 @@
 
 html {
   font-size: 16px;
-  height: 100%;
-  overflow: hidden;
 }
 
 body {
@@ -82,8 +80,6 @@ body {
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  height: 100%;
-  overflow: hidden;
 }
 
 

@@ -21,6 +21,7 @@ export default function ReportsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [impact, setImpact] = useState<any>(null);
   const [responseStats, setResponseStats] = useState<any>(null);
+  const [responsePlan, setResponsePlan] = useState<any>(null);
   const [impactLoading, setImpactLoading] = useState(false);
 
   useEffect(() => {
@@ -55,6 +56,7 @@ export default function ReportsPage() {
         setImpact(impData.data);
         if (rspData.data) {
           setResponseStats(rspData.data.comparison);
+          setResponsePlan(rspData.data);
         }
       } catch (e) {
         console.error('Failed to fetch details', e);
@@ -126,24 +128,58 @@ export default function ReportsPage() {
 
   const selectedIncident = incidents.find(i => i.id === selectedIncidentId);
 
-  // Mock data for charts
-  const facilityData = [
-    { name: 'WH-001', affected: 1200, safe: 8400 },
-    { name: 'WH-002', affected: 450, safe: 3200 },
-    { name: 'ST-042', affected: 340, safe: 120 },
-    { name: 'ST-019', affected: 210, safe: 450 },
-  ];
+  // Dynamic data for charts
+  const facilityData = impact?.lines ? (() => {
+    const facilities = new Map();
+    impact.lines.forEach((line: any) => {
+      if (line.nodeType === 'warehouse' || line.nodeType === 'store') {
+        const loc = line.location || line.nodeId;
+        const shortLoc = loc.split(' ')[0]; // e.g. WH-001 (Central) -> WH-001
+        if (!facilities.has(shortLoc)) {
+          facilities.set(shortLoc, { name: shortLoc, affected: 0, safe: 0, uncertain: 0 });
+        }
+        const data = facilities.get(shortLoc);
+        if (line.status === 'affected') data.affected += line.quantity || 0;
+        if (line.status === 'safe') data.safe += line.quantity || 0;
+        if (line.status === 'uncertain') data.uncertain += line.quantity || 0;
+      }
+    });
+    return Array.from(facilities.values())
+      .filter(f => f.affected > 0 || f.safe > 0)
+      .sort((a, b) => b.affected - a.affected)
+      .slice(0, 5);
+  })() : [];
 
-  const productData = [
-    { name: 'Product A', value: 4500, color: 'var(--color-critical)' },
-    { name: 'Product B', value: 2100, color: 'var(--color-warning)' },
-    { name: 'Product C', value: 1375, color: 'var(--color-orange)' },
-  ];
+  const productData = impact?.lines ? (() => {
+    const products = new Map();
+    impact.lines.forEach((line: any) => {
+      if (line.status === 'affected') {
+        const pName = (line.label || '').split(' (')[0] || line.productId || 'Unknown';
+        products.set(pName, (products.get(pName) || 0) + (line.quantity || 0));
+      }
+    });
+    
+    const colors = ['var(--color-critical)', 'var(--color-warning)', 'var(--color-orange)', 'var(--color-primary)', 'var(--color-success)'];
+    
+    return Array.from(products.entries())
+      .filter(p => p[1] > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, value], idx) => ({
+        name,
+        value,
+        color: colors[idx % colors.length]
+      }));
+  })() : [];
 
   const costData = responseStats ? [
     { name: 'Naive Approach', cost: responseStats.naive.totalCost },
     { name: 'LOGIS Response', cost: responseStats.logis.totalCost }
   ] : [];
+  
+  const criticalActions = responsePlan?.actions?.filter((a: any) => 
+    a.type === 'quarantine' || a.type === 'withdraw' || a.type === 'verify'
+  ).sort((a: any, b: any) => b.units - a.units).slice(0, 5) || [];
 
   if (loading) {
     return (
@@ -366,21 +402,27 @@ export default function ReportsPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                          <tr className="bg-surface-2/30">
-                            <td className="py-3 px-2 font-medium">WH-001 (Central)</td>
-                            <td className="py-3 px-2"><span className="text-critical font-semibold">Critical Impact</span></td>
-                            <td className="py-3 px-2 text-right tabular-nums">1,200</td>
-                          </tr>
-                          <tr>
-                            <td className="py-3 px-2 font-medium">WH-002 (North)</td>
-                            <td className="py-3 px-2"><span className="text-critical font-semibold">Critical Impact</span></td>
-                            <td className="py-3 px-2 text-right tabular-nums">450</td>
-                          </tr>
-                          <tr className="bg-surface-2/30">
-                            <td className="py-3 px-2 font-medium">ST-042 (Metro)</td>
-                            <td className="py-3 px-2"><span className="text-warning font-semibold">Needs Verification</span></td>
-                            <td className="py-3 px-2 text-right tabular-nums">340</td>
-                          </tr>
+                          {criticalActions.map((action: any, index: number) => (
+                            <tr key={action.id} className={index % 2 === 0 ? "bg-surface-2/30" : ""}>
+                              <td className="py-3 px-2 font-medium">{action.location}</td>
+                              <td className="py-3 px-2">
+                                <span className={cn(
+                                  "font-semibold",
+                                  action.type === 'verify' ? "text-warning" : "text-critical"
+                                )}>
+                                  {action.type === 'verify' ? 'Needs Verification' : 'Critical Impact'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-2 text-right tabular-nums">{formatNumber(action.units)}</td>
+                            </tr>
+                          ))}
+                          {criticalActions.length === 0 && (
+                            <tr>
+                              <td colSpan={3} className="py-6 text-center text-muted-foreground text-[13px]">
+                                No critical actions found for this incident.
+                              </td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
