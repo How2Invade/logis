@@ -7,7 +7,7 @@
   <p>
     <img src="https://img.shields.io/badge/Hackathon-4.0-blue?style=for-the-badge" alt="Hackathon 4.0" />
     <img src="https://img.shields.io/badge/Challenge-OpsGenie%20AI-orange?style=for-the-badge" alt="OpsGenie AI" />
-    <img src="https://img.shields.io/badge/Team-Mac%20n%20Code-brightgreen?style=for-the-badge" alt="39" />
+    <img src="https://img.shields.io/badge/Team39-brightgreen?style=for-the-badge" alt="Team39" />
     <img src="https://img.shields.io/badge/Status-Prototype-lightgrey?style=for-the-badge" alt="Prototype" />
   </p>
 </div>
