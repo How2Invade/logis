@@ -394,7 +394,7 @@ Potential future extensions include:
   <img src="public/logo.png" alt="LOGIS Logo" width="60" />
   <br/><br/>
   
-  <h3>👥 Team Mac n Code</h3>
+  <h3>Team39</h3>
   <p>Jeet Chavan • Meet Mangaonkar • Sanika Lobo</p>
   <p><em>Hackathon 4.0 | OpsGenie AI — AI for Intelligent Business Operations</em></p>
 </div>
@@ -404,7 +404,7 @@ Potential future extensions include:
 <div align="center">
   <p>◼ <strong>LOGIS</strong></p>
   <p>Trace the impact. Act on what matters. Recover faster.</p>
-  <p>Built by Mac n Code</p>
+  <p>Built by Team39</p>
   <p>Hackathon 4.0 · 2026</p>
   <br/>
   <p><em>Designed to make complex operations easier to understand, act on, and recover from.</em></p>
