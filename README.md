@@ -104,14 +104,15 @@ flowchart LR
 
 | Feature | Description |
 | :--- | :--- |
-| 🕸️ **Impact Network** | Interactive supply-chain visualization using ReactFlow and Dagre. |
-| 🎯 **Impact Analysis** | Instantly identify affected, safe, and uncertain inventory quantities. |
-| ⚡ **Response Planning** | Turn graph analysis into targeted, cost-aware operational actions. |
+| 🕸️ **Impact Network** | Interactive supply-chain visualization using ReactFlow and Dagre with automated step-by-step downstream propagation tracing. |
+| 📸 **Network Snapshot Export** | High-fidelity canvas/PDF export of the active supply chain graph and topology with metadata overlays. |
+| 🎯 **Impact Analysis** | Instantly identify affected, safe, and uncertain inventory quantities with node-level risk explainability. |
+| ⚡ **Response Planning** | Turn graph analysis into targeted, cost-aware operational actions comparing naive vs. surgical interventions. |
 | ✅ **Action Tracker** | Track response execution using checkboxes, owners, priorities, and completion state. |
 | ♻️ **Recovery** | Analyze available resources (warehouses, transport, machines) to fulfill disrupted demand. |
-| 📊 **Analytics** | Management-level operational visibility comparing naive vs. targeted responses. |
-| 🔮 **Scenario Analysis** | Explore possible operational outcomes and response costs. |
-| 📄 **Reporting** | Generate and export incident reports (PDF, JSON, TXT). |
+| 🔮 **Scenario Simulation Engine** | Dynamic simulator modeling multiple operational disruptions (supplier contamination, fleet deficits, warehouse bottlenecks) with real-time KPI updates. |
+| 📄 **Dynamic Reports & PDF Generator** | Generate customizable multi-profile reports (Comprehensive, Impact-Only, Recovery-Only) with automated, branded PDF document exports. |
+
 
 ---
 
@@ -123,7 +124,8 @@ The graph allows users to:
 - Drag, zoom, and pan across the network.
 - Inspect individual nodes for detailed lineage and status.
 - Focus directly on the incident source.
-- Trace downstream impact paths.
+- **Trace Downstream Impact:** Watch animated, real-time traversal step-by-step as disruptions propagate across facilities and nodes, complete with a live progress indicator and active node telemetry.
+- **High-Resolution Graph Snapshot:** Capture and export crisp, high-fidelity PDF snapshots of the active network state with legends and metrics intact.
 
 We use **semantic status colors** to instantly communicate risk:
 - 🔴 **Affected:** Critical contamination / defect paths.
@@ -186,16 +188,25 @@ Reduced Operational Disruption
 
 ---
 
-## Analytics
+## Analytics & Scenario Simulation
 
-LOGIS includes comprehensive operational visibility panels:
+LOGIS includes comprehensive operational visibility and predictive simulation panels:
 
-- **Impact:** Breakdown of affected, safe, and uncertain units, along with impacted facilities.
-- **Response:** Cost and time savings comparisons between a naive (broad) response and a targeted LOGIS response.
-- **Recovery:** Available warehouse capacity, machine utilization, and prioritized unmet demand.
-- **Scenarios:** Financial exposure and operational outcomes under different response strategies.
+- **Impact Intelligence:** Breakdown of affected, safe, and uncertain units, along with impacted facilities and lineage traces.
+- **Response Efficiency:** Real-time cost and time savings comparisons evaluating a naive (broad) recall vs. a surgical LOGIS targeted response.
+- **Resource Recovery:** Tracking available warehouse capacity, machine utilization, and prioritized unmet demand re-routing.
+- **Dynamic Scenario Simulator:**
+  - **Supplier Contamination:** Models upstream raw material failures and downstream propagation.
+  - **Transport Disruption:** Simulates fleet reductions, available trucks vs. capacity deficits, and logistical rerouting.
+  - **Facility Quarantine:** Analyzes warehouse quarantining, bottleneck capacity, and overflow risk.
+  - Dynamic KPI cards and Recharts visualizations that update in real time based on user scenario selections.
+- **Custom Multi-Profile Reporting:**
+  - **Comprehensive:** Complete executive briefing with impact breakdowns, action plans, recovery metrics, and audit log.
+  - **Impact-Only:** Specialized report for QA/investigation teams with node damage assessments and facility risk.
+  - **Recovery-Only:** Operational playbook focusing on warehouse capacity, unmet demand, and fleet redistribution.
+  - Dynamic UI views and pixel-perfect multi-page PDF generation via jsPDF.
 
-*(Note: All analytics currently utilize synthetic demonstration data).*
+*(Note: Demonstration data is synthetic and modeled for the hackathon).*
 
 ---
 
@@ -267,7 +278,7 @@ flowchart TD
 - **Frontend:** Next.js (App Router), React, Tailwind CSS, Lucide Icons, Radix UI.
 - **Visualization:** ReactFlow, Dagre, Recharts.
 - **Backend & Data:** Node.js, `better-sqlite3`.
-- **Reporting:** `jspdf`, `html2canvas`.
+- **Reporting & Export:** `jspdf`, `html2canvas`, `html-to-image`.
 
 ---
 
