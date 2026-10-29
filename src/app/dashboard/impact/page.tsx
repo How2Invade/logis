@@ -147,6 +147,7 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [traceProgress, setTraceProgress] = useState<number | null>(null);
   const [activeTraceNodeId, setActiveTraceNodeId] = useState<string | null>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
   const { fitView, setCenter, getNodes } = useReactFlow();
   const sweepTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -156,8 +157,11 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
     const { initialNodes, initialEdges } = layoutElements(impact.nodes, impact.edges);
     setNodes(initialNodes);
     setEdges(initialEdges);
-    setTimeout(() => fitView({ padding: 0.2, duration: 800 }), 100);
-  }, [impact, setNodes, setEdges, fitView]);
+    setTimeout(() => {
+      reactFlowInstance?.fitView({ padding: 0.15 });
+      fitView({ padding: 0.15, duration: 800 });
+    }, 50);
+  }, [impact, setNodes, setEdges, fitView, reactFlowInstance]);
 
   // Apply / remove prediction mode props whenever it toggles
   useEffect(() => {
@@ -423,6 +427,7 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
         onPaneClick={() => setSelectedNodeId(null)}
+        onInit={setReactFlowInstance}
         nodeTypes={nodeTypes}
         minZoom={0.1}
         maxZoom={2}
@@ -654,7 +659,19 @@ export default function ImpactMapPage() {
   useEffect(() => {
     async function runAnalysis() {
       try {
-        const res = await fetch('/api/incidents/INC-001/analyze', { method: 'POST' });
+        const incidentsRes = await fetch('/api/incidents');
+        const incidentsData = await incidentsRes.json();
+        const incidents = incidentsData.data || incidentsData;
+        const active = (Array.isArray(incidents) ? incidents : []).find((i: any) => i.severity === 'critical')
+          || (Array.isArray(incidents) ? incidents[0] : null);
+        if (!active) {
+          setError('No open incidents');
+          setLoading(false);
+          return;
+        }
+        const incidentId = active.id;
+
+        const res = await fetch(`/api/incidents/${incidentId}/analyze`, { method: 'POST' });
         if (!res.ok) throw new Error('Analysis failed');
         const data = await res.json();
         setImpact(data.data);

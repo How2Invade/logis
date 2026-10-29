@@ -18,20 +18,25 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [incRes, impRes, rspRes] = await Promise.all([
-          fetch('/api/incidents'),
-          fetch('/api/incidents/INC-001/analyze', { method: 'POST' }),
-          fetch('/api/incidents/INC-001/response', { method: 'POST' })
-        ]);
-        
+        const incRes = await fetch('/api/incidents');
         const incData = await incRes.json();
-        const impData = await impRes.json();
-        const rspData = await rspRes.json();
-        
-        setIncidents(incData.data || []);
-        setImpact(impData.data);
-        if (rspData.data) {
-           setResponseStats(rspData.data.comparison);
+        const incList: Incident[] = incData.data || [];
+        setIncidents(incList);
+
+        if (incList.length > 0) {
+          const target = incList.find(i => i.severity === 'critical') || incList[0];
+          const [impRes, rspRes] = await Promise.all([
+            fetch(`/api/incidents/${target.id}/analyze`, { method: 'POST' }),
+            fetch(`/api/incidents/${target.id}/response`, { method: 'POST' })
+          ]);
+          
+          const impData = await impRes.json();
+          const rspData = await rspRes.json();
+          
+          setImpact(impData.data);
+          if (rspData.data) {
+             setResponseStats(rspData.data.comparison);
+          }
         }
       } catch (e) { console.error(e); }
       finally { setLoading(false); }
@@ -192,11 +197,17 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <SectionHeader title="Response Performance" />
             {responseStats && (
-               <div className="text-[11px] font-bold text-success flex items-center gap-1 bg-success/10 px-2 py-0.5 rounded border border-success/20">
-                 Saved {responseStats.logis.estimatedTimeHours}h
-               </div>
+              <div
+                title={responseStats.baselineExplanation || "Naive baseline: recall all batches of the same product from the same plant. LOGIS baseline: only confirmed + probable affected units. Formula: naive cost minus LOGIS cost, divided by assumed hourly holding rate from cost_rates table."}
+                className="text-[11px] font-bold text-success flex items-center gap-1 bg-success/10 px-2 py-0.5 rounded border border-success/20 cursor-help"
+              >
+                Saved {responseStats.logis.estimatedTimeHours}h (assumed)
+              </div>
             )}
           </div>
+          <p className="text-[10px] text-muted-foreground mt-1 mb-2 leading-tight">
+            Naive: recall all batches from plant · LOGIS: confirmed + probable only · Cost delta / holding rate (assumed)
+          </p>
           <div className="flex-1 min-h-0 mt-4 pr-4">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={performanceData} layout="vertical" margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>

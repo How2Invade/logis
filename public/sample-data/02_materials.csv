@@ -1,0 +1,9 @@
+id,name,supplier_id,unit,category
+MAT-CSV-01,Organic Rolled Oats,SUP-CSV-01,kg,Raw Grains
+MAT-CSV-02,Stone-Ground Wheat Flour,SUP-CSV-02,kg,Milled Flour
+MAT-CSV-03,Refined Liquid Cane Invert,SUP-CSV-03,L,Sweeteners
+MAT-CSV-04,Cultured Salted Butterfat,SUP-CSV-04,kg,Dairy
+MAT-CSV-05,Pure Bourbon Vanilla Extract,SUP-CSV-05,L,Flavoring
+MAT-CSV-06,Golden Flaxseed Meal,SUP-CSV-01,kg,Raw Grains
+MAT-CSV-07,Dark Dutch Cocoa Powder,SUP-CSV-05,kg,Specialty
+

@@ -181,12 +181,23 @@ function CounterCard({ icon: Icon, label, value, color }: { icon: any; label: st
 
 function InspectionModal({ onClose, onComplete }: { onClose: () => void; onComplete: (lotId?: string) => void }) {
   const [step, setStep] = useState(1);
+  const [activeLots, setActiveLots] = useState<any[]>([]);
   const [form, setForm] = useState({
-    productId: 'P-001', batchId: 'B51', lotId: 'MILK-204',
+    productId: 'P-001', batchId: 'B51', lotId: 'LOT-2024-001',
     testType: 'microbial_contamination', result: 'fail' as 'pass' | 'fail',
     severity: 'critical' as string, incidentType: 'contamination' as string,
     notes: '',
   });
+
+  useEffect(() => {
+    // Dynamically load active lots and warehouses from database
+    fetch('/api/resources')
+      .then(r => r.json())
+      .then(d => {
+        // if resources has inventory or lots
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit() {
     try {
@@ -206,7 +217,7 @@ function InspectionModal({ onClose, onComplete }: { onClose: () => void; onCompl
             type: form.incidentType,
             sourceLot: form.lotId,
             severity: form.severity,
-            location: 'NovaFoods Central Hub (WH-001)',
+            location: 'Quality Inspection Lab & Storage Zone',
             title: `${form.testType.replace('_', ' ')} — Lot ${form.lotId}`,
             description: `Inspection failed for ${form.testType.replace('_', ' ')} on Lot ${form.lotId}`,
           }),

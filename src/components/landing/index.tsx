@@ -327,7 +327,7 @@ export const ResponseSection = () => {
           
           <div className="space-y-3">
             {[
-              { text: 'Quarantine affected inventory WH-001', status: 'approved' },
+              { text: 'Quarantine affected inventory in central depot', status: 'approved' },
               { text: 'Stop shipment SH-0019', status: 'approved' },
               { text: 'Withdraw from Store ST-042', status: 'approved' },
               { text: 'Customer recall for Batch 4A', status: 'rejected' },

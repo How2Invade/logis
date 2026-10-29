@@ -321,6 +321,9 @@ export interface ResponseComparison {
   };
   unnecessaryRecallAvoided: number;
   costSaved: number;
+  hoursSavedFormula?: string;
+  baselineExplanation?: string;
+  isAssumedHours?: boolean;
 }
 
 export interface ResponsePlan {

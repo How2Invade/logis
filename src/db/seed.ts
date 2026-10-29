@@ -18,7 +18,7 @@ export function seedDatabase() {
 
   // Drop all tables and recreate
   const tableNames = [
-    'audit_log', 'timeline_events', 'inspections', 'cost_rates', 'demand',
+    'dataset_meta', 'audit_log', 'timeline_events', 'inspections', 'cost_rates', 'demand',
     'routes', 'trucks', 'workers', 'machines', 'customers', 'sales',
     'stores', 'shipments', 'inventory', 'warehouses', 'batch_lot_usage',
     'batches', 'products', 'lots', 'materials', 'suppliers', 'incidents'
@@ -882,6 +882,20 @@ export function seedDatabase() {
   auditInsert.run('AUD-001', 'inspection_created', 'inspection', 'INSP-001', 'Microbial contamination test failed for Lot MILK-204', '2026-09-28T09:15:00Z', 'quality_inspector');
   auditInsert.run('AUD-002', 'incident_created', 'incident', 'INC-001', 'Incident INC-001 created from inspection INSP-001', '2026-09-28T09:15:00Z', 'quality_inspector');
   auditInsert.run('AUD-003', 'incident_created', 'incident', 'INC-002', 'Temperature excursion incident created for WH-004', '2026-09-29T14:30:00Z', 'system');
+
+  // --- Dataset Meta ---
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS dataset_meta (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      source_file TEXT NOT NULL,
+      imported_at TEXT NOT NULL,
+      mode TEXT NOT NULL,
+      is_simulation INTEGER NOT NULL DEFAULT 1
+    );
+  `);
+  const metaInsert = sqlite.prepare('INSERT INTO dataset_meta VALUES (?,?,?,?,?,?)');
+  metaInsert.run('active_dataset', 'NovaFoods Dairy Network', 'seed.ts', new Date().toISOString(), 'seed', 1);
 
   sqlite.pragma('foreign_keys = ON');
   sqlite.close();

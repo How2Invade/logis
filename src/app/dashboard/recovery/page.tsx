@@ -10,11 +10,25 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 export default function RecoveryPage() {
   const [recovery, setRecovery] = useState<RecoveryResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [activeIncidentId, setActiveIncidentId] = useState<string>('INC-001');
+
+  useEffect(() => {
+    fetch('/api/incidents')
+      .then(r => r.json())
+      .then(d => {
+        const list = d.data || [];
+        if (list.length > 0) {
+          const target = list.find((i: any) => i.severity === 'critical') || list[0];
+          setActiveIncidentId(target.id);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function generatePlan() {
     setLoading(true);
     try {
-      const res = await fetch('/api/incidents/INC-001/recovery', { method: 'POST' });
+      const res = await fetch(`/api/incidents/${activeIncidentId}/recovery`, { method: 'POST' });
       const data = await res.json();
       setRecovery(data.data);
     } catch (e) { console.error(e); }
@@ -42,7 +56,7 @@ export default function RecoveryPage() {
         <div className="rounded-2xl border border-border bg-surface p-12 text-center shadow-sm">
           <Wrench className="w-8 h-8 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-[15px] font-semibold text-foreground mb-2">Recovery Plan Not Generated</h3>
-          <p className="text-[14px] text-muted-foreground mb-6">Compute recovery opportunities for INC-001.</p>
+          <p className="text-[14px] text-muted-foreground mb-6">Compute recovery opportunities for {activeIncidentId}.</p>
           <button onClick={generatePlan}
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-dark-action text-dark-action-fg text-[14px] font-semibold hover:opacity-90 transition-opacity shadow-sm">
             <Play className="w-4 h-4" /> Generate Recovery Plan
@@ -52,7 +66,23 @@ export default function RecoveryPage() {
 
       {loading && <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="skeleton h-24 rounded-lg" />)}</div>}
 
-      {recovery && (
+      {recovery && recovery.unmetDemand.length === 0 && recovery.idleResources.filter(r => r.type === 'machine').length === 0 && (
+        <div className="rounded-2xl border border-border bg-surface p-12 text-center shadow-sm">
+          <Wrench className="w-8 h-8 text-warning mx-auto mb-4" />
+          <h3 className="text-[16px] font-semibold text-foreground mb-2">Recovery Plan Unavailable</h3>
+          <p className="text-[14px] text-muted-foreground max-w-lg mx-auto mb-6">
+            Recovery plan unavailable: no demand or production data found for this dataset. Import demand and machine rows or use the placeholder generator in Settings.
+          </p>
+          <a
+            href="/dashboard/settings"
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-surface-2 border border-border text-[14px] font-semibold text-foreground hover:bg-surface transition-colors shadow-sm"
+          >
+            Go to Settings & Data Management
+          </a>
+        </div>
+      )}
+
+      {recovery && (recovery.unmetDemand.length > 0 || recovery.idleResources.filter(r => r.type === 'machine').length > 0) && (
         <>
           {/* Resource Summary */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -89,8 +119,8 @@ export default function RecoveryPage() {
             <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm flex flex-col transition-colors duration-300 h-full overflow-hidden">
               <h3 className="text-[16px] font-semibold text-foreground mb-4">Unmet Demand Details</h3>
               <div className="flex-1 overflow-y-auto pr-2 space-y-3">
-                {recovery.unmetDemand.map(d => (
-                  <div key={d.productId} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-2/50 border border-border rounded-xl transition-colors">
+                {recovery.unmetDemand.map((d, idx) => (
+                  <div key={`${d.productId}-${d.deadline}-${idx}`} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-2/50 border border-border rounded-xl transition-colors">
                     <div className="mb-2 sm:mb-0">
                       <div className="text-[14px] font-semibold text-foreground mb-1">{d.productName}</div>
                       <div className="text-[13px] text-muted-foreground">Demand: {formatNumber(d.demandUnits)} · Gap: <span className="text-warning font-medium">{formatNumber(d.gap)}</span></div>

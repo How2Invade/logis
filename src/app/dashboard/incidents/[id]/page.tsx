@@ -427,8 +427,8 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
             <div className="mb-6">
               <h4 className="text-xs text-muted-foreground mb-3">Unmet Demand</h4>
               <div className="space-y-2">
-                {recovery.unmetDemand.map(d => (
-                  <div key={d.productId} className="flex items-center gap-4 p-3 rounded-md border border-border">
+                {recovery.unmetDemand.map((d, idx) => (
+                  <div key={`${d.productId}-${d.deadline}-${idx}`} className="flex items-center gap-4 p-3 rounded-md border border-border">
                     <div className="flex-1">
                       <div className="text-sm font-medium">{d.productName}</div>
                       <div className="text-xs text-muted-foreground">

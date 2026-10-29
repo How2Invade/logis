@@ -1,0 +1,32 @@
+{
+  "currency": "INR",
+  "disclaimer": "ALL FIGURES ARE SYNTHETIC WORKING ASSUMPTIONS FOR SIMULATION PURPOSES ONLY. NOT NESTLÉ INDIA INTERNAL DATA.",
+  "costs": {
+    "holdingCostPerPalletDayINR": 180.0,
+    "disposalCostPerPalletINR": 12500.0,
+    "quarantineInspectionFeePerPalletINR": 650.0,
+    "expeditedFreightPerKmPerTruckINR": 55.0,
+    "standardFreightPerKmPerTruckINR": 32.0,
+    "labReTestCostPerBatchSampleINR": 35000.0,
+    "labReTestLeadTimeDays": 5,
+    "customerOtifPenaltiesINR": {
+      "key_account_modern_trade": 250000.0,
+      "quick_commerce_dark_store": 120000.0,
+      "regional_distributor": 50000.0,
+      "retail_wholesaler": 15000.0
+    }
+  },
+  "operationalConstraints": {
+    "maxAccreditedNablLabsDailyCapacity": 12,
+    "reverseLogisticsFleetAvailableTrucks": 45,
+    "regionalWarehouseQuarantineZonePalletCap": {
+      "WH-DELHI-CD01": 250,
+      "WH-LUCKNOW-CD02": 200,
+      "WH-KOLKATA-CD03": 180,
+      "WH-MUMBAI-CD04": 300,
+      "WH-BENGALURU-CD05": 220,
+      "WH-HYDERABAD-CD06": 190
+    }
+  }
+}
+

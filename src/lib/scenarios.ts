@@ -15,13 +15,13 @@ export const SCENARIO_PRESETS: ScenarioPreset[] = [
   {
     id: 'additional_batch',
     title: 'Additional Batch Contamination',
-    description: 'Batch B72 also used MILK-204',
+    description: 'Simulate adjacent batch exposure via shared silo cross-feed',
     modifiers: [{ type: 'additional_batch', params: { batchId: 'B60', confidence: 'confirmed', fractionUsed: 1.0 } }],
   },
   {
     id: 'warehouse_unavailable',
-    title: 'Warehouse WH-002 Unavailable',
-    description: 'WH-002 becomes unavailable for operations',
+    title: 'Regional Warehouse Isolation',
+    description: 'Simulate key distribution depot going offline',
     modifiers: [{ type: 'warehouse_unavailable', params: { warehouseId: 'WH-002' } }],
   },
   {

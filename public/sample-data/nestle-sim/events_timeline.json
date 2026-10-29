@@ -1,0 +1,42 @@
+{
+  "simulation_topic": "Regulatory Test Dispute — Public Context Milestones (2015)",
+  "disclaimer": "Public-event context to model. All supply-chain entities and operational numbers are synthetic.",
+  "timeline": [
+    {
+      "date": "2015-03-15",
+      "stage": "Sample Collection & Initial State Testing",
+      "event": "State food-safety laboratory in Barabanki, Uttar Pradesh draws routine market surveillance samples of Maggi Masala noodles.",
+      "source_note": "verify against news sources",
+      "operational_impact": "Incident detection trigger. Sample tied to batch production code; lot linkage verification initiated."
+    },
+    {
+      "date": "2015-04-30",
+      "stage": "Contested State Lab Findings",
+      "event": "State lab report alleges parameters (lead/MSG labelling interpretations) exceed standards. Nestlé India publicly disputes methodology, noting testing protocol did not adhere to product category norms.",
+      "source_note": "verify against news sources",
+      "operational_impact": "Disputed test flag set. Recommended action: HOLD + ACCREDITED NABL RE-TEST rather than immediate unrecoverable destruction."
+    },
+    {
+      "date": "2015-06-05",
+      "stage": "Regulatory Hold & Withdrawal Order",
+      "event": "National & state food authorities issue recall orders. Massive reverse-logistics operation initiated to withdraw finished stock from retail shelves and distributor warehouses across India.",
+      "source_note": "verify against news sources",
+      "operational_impact": "Nationwide reverse logistics activated. High-risk states (Uttar Pradesh priority) scoped immediately."
+    },
+    {
+      "date": "2015-08-13",
+      "stage": "Judicial Intervention & Accredited Re-testing Order",
+      "event": "Hon'ble Bombay High Court sets aside the ban, observing principles of natural justice were not met and testing was not conducted in accredited labs. Re-testing of fresh samples ordered at three certified labs.",
+      "source_note": "verify against news sources",
+      "operational_impact": "Validation of LOGIS 'HOLD + RE-TEST' policy over unhedged immediate inventory destruction."
+    },
+    {
+      "date": "2015-11-09",
+      "stage": "Product Clearance & Market Re-launch",
+      "event": "All fresh samples cleared by certified accredited laboratories; product re-enters nationwide distribution channels.",
+      "source_note": "verify against news sources",
+      "operational_impact": "Supply chain recovery phase executed with restored safety stocks."
+    }
+  ]
+}
+

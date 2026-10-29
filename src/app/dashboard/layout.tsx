@@ -41,6 +41,7 @@ const navGroups = [
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [authorized, setAuthorized] = useState(false);
+  const [datasetMeta, setDatasetMeta] = useState<{ name: string; isSimulation: boolean } | null>(null);
 
   useEffect(() => {
     const check = () => {
@@ -51,11 +52,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
     };
     check();
-    // Re-check when a page is restored from the back/forward cache after logout.
     const onPageShow = () => check();
     window.addEventListener('pageshow', onPageShow);
     return () => window.removeEventListener('pageshow', onPageShow);
   }, []);
+
+  useEffect(() => {
+    fetch('/api/dataset/meta')
+      .then(r => r.json())
+      .then(d => {
+        if (d?.data) {
+          setDatasetMeta({ name: d.data.name, isSimulation: d.data.isSimulation });
+        }
+      })
+      .catch(() => {});
+  }, [pathname]);
 
   if (!authorized) {
     return <div className="h-screen bg-background" />;
@@ -123,7 +134,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-auto bg-background transition-colors duration-300">
-        <main>
+        {/* Top Bar with active dataset indicator */}
+        <header className="h-[44px] shrink-0 border-b border-border bg-surface px-8 flex items-center justify-between text-[12px]">
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground font-medium">Dataset:</span>
+            <span className="font-semibold text-foreground">
+              {datasetMeta ? datasetMeta.name : 'NovaFoods Dairy Network'}
+            </span>
+            {datasetMeta?.isSimulation && (
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-warning/15 text-warning border border-warning/30">
+                SIMULATION
+              </span>
+            )}
+          </div>
+          <div className="text-[11px] text-muted-foreground hidden sm:block">
+            Incident Intelligence & Operational Recovery
+          </div>
+        </header>
+
+        <main className="flex-1">
           {children}
         </main>
       </div>

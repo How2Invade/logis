@@ -231,3 +231,13 @@ export const auditLog = sqliteTable('audit_log', {
   timestamp: text('timestamp').notNull(),
   userId: text('user_id').notNull(),
 });
+
+// --- Dataset Metadata ---
+export const datasetMeta = sqliteTable('dataset_meta', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  sourceFile: text('source_file').notNull(),
+  importedAt: text('imported_at').notNull(),
+  mode: text('mode').notNull(), // replace | append
+  isSimulation: integer('is_simulation', { mode: 'boolean' }).notNull().default(true),
+});

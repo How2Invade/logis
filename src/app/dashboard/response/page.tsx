@@ -28,9 +28,21 @@ export default function ResponsePage() {
   const [expandedActionId, setExpandedActionId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [showAllActions, setShowAllActions] = useState(false);
+  const [activeIncidentId, setActiveIncidentId] = useState<string>('INC-001');
 
   useEffect(() => {
     setMounted(true);
+    fetch('/api/incidents')
+      .then(r => r.json())
+      .then(d => {
+        const list = d.data || [];
+        if (list.length > 0) {
+          const target = list.find((i: any) => i.severity === 'critical') || list[0];
+          setActiveIncidentId(target.id);
+        }
+      })
+      .catch(() => {});
+
     // Attempt to load actions from localStorage first if we already have them saved
     try {
       const saved = localStorage.getItem(ACTION_TRACKER_STORAGE_KEY);
@@ -38,19 +50,23 @@ export default function ResponsePage() {
         const parsed = JSON.parse(saved);
         if (parsed && Array.isArray(parsed) && parsed.length > 0) {
           setActions(parsed);
-          // Still need the plan object for comparison stats. We'll generate it silently if missing.
-          fetch('/api/incidents/INC-001/response', { method: 'POST' })
-            .then(r => r.json())
-            .then(data => {
-              if (data?.data) setPlan(data.data);
-            })
-            .catch(console.error);
         }
       }
     } catch (e) {
       console.error('Failed to load local storage actions', e);
     }
   }, []);
+
+  useEffect(() => {
+    if (activeIncidentId) {
+      fetch(`/api/incidents/${activeIncidentId}/response`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+          if (data?.data) setPlan(data.data);
+        })
+        .catch(console.error);
+    }
+  }, [activeIncidentId]);
 
   useEffect(() => {
     if (actions.length > 0 && mounted) {
@@ -64,7 +80,7 @@ export default function ResponsePage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/incidents/INC-001/response', { method: 'POST' });
+      const res = await fetch(`/api/incidents/${activeIncidentId}/response`, { method: 'POST' });
       if (!res.ok) throw new Error('Failed to generate response plan');
       const data = await res.json();
       
@@ -170,7 +186,7 @@ export default function ResponsePage() {
         <div className="rounded-2xl border border-border bg-surface p-16 text-center shadow-sm">
           <Shield className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-[16px] font-semibold text-foreground mb-2">No Active Response Plan</h3>
-          <p className="text-[14px] text-muted-foreground mb-6 max-w-md mx-auto">Generate a data-driven response plan for INC-001 to calculate optimal recall boundaries, quarantine zones, and estimated recovery costs.</p>
+          <p className="text-[14px] text-muted-foreground mb-6 max-w-md mx-auto">Generate a data-driven response plan for {activeIncidentId} to calculate optimal recall boundaries, quarantine zones, and estimated recovery costs.</p>
           <button onClick={generatePlan}
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-dark-action text-dark-action-fg text-[14px] font-semibold hover:opacity-90 transition-opacity shadow-sm">
             <Shield className="w-4 h-4" />

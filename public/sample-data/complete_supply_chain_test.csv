@@ -1,0 +1,21 @@
+EntityType,ID,Name_or_Type,Parent_or_Origin,Target_or_Dest,Quantity,Unit_or_Price,Status_or_Conf
+supplier,SUP-PACIFIC-01,Pacific Organic Growers,Salinas CA,orders@pacificgrowers.com,4.9,rating,active
+supplier,SUP-CASCADE-02,Cascade Mountain Milling,Spokane WA,supply@cascademill.com,4.7,rating,active
+material,MAT-ALMOND-01,Raw Organic Almonds,SUP-PACIFIC-01,N/A,10000,kg,Raw Nuts
+material,MAT-OATFLOUR-02,Milled Oat Flour,SUP-CASCADE-02,N/A,15000,kg,Grains
+lot,LOT-TEST-901,MAT-ALMOND-01,SUP-PACIFIC-01,N/A,8500,kg,active
+lot,LOT-TEST-902,MAT-OATFLOUR-02,SUP-CASCADE-02,N/A,12000,kg,active
+product,PRD-BAR-801,Almond Oat SuperBar 12pk,Snacks,N/A,24.50,shelf_180d,active
+batch,BAT-TEST-701,PRD-BAR-801,LINE-MIX-01,L1,3200,units,active
+batch,BAT-TEST-702,PRD-BAR-801,LINE-MIX-02,L2,2800,units,active
+batch_lot_usage,BLU-701-901,confirmed,LOT-TEST-901,BAT-TEST-701,1.0,fraction,confirmed
+batch_lot_usage,BLU-701-902,confirmed,LOT-TEST-902,BAT-TEST-701,1.0,fraction,confirmed
+batch_lot_usage,BLU-702-901,probable,LOT-TEST-901,BAT-TEST-702,0.8,fraction,probable
+warehouse,WH-SEATTLE-01,Pacific Northwest Hub,Seattle WA,N/A,85000,sqft,active
+inventory,PLT-TEST-501,PRD-BAR-801,BAT-TEST-701,WH-SEATTLE-01,1600,units,available
+inventory,PLT-TEST-502,PRD-BAR-801,BAT-TEST-702,WH-SEATTLE-01,1400,units,available
+shipment,SHP-TEST-301,BAT-TEST-701,WH-SEATTLE-01,Store #204 Seattle,800,units,in_transit
+shipment,SHP-TEST-302,BAT-TEST-702,WH-SEATTLE-01,Store #205 Bellevue,600,units,in_transit
+store,STR-204,Organic Market Seattle,Downtown Seattle WA,N/A,1,store,active
+store,STR-205,Whole Foods Bellevue,Bellevue Square WA,N/A,1,store,active
+

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn, formatNumber, formatCurrency } from '@/lib/utils';
 import { Layers, Play, ArrowUpRight, ArrowDownRight, Minus, AlertTriangle, Warehouse, Truck, TrendingUp, Info } from 'lucide-react';
 import type { ScenarioResult } from '@/lib/types';
@@ -21,6 +21,20 @@ export default function ScenariosPage() {
   const [result, setResult] = useState<ScenarioResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
+  const [activeIncidentId, setActiveIncidentId] = useState<string>('INC-001');
+
+  useEffect(() => {
+    fetch('/api/incidents')
+      .then(r => r.json())
+      .then(d => {
+        const list = d.data || [];
+        if (list.length > 0) {
+          const target = list.find((i: any) => i.severity === 'critical') || list[0];
+          setActiveIncidentId(target.id);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function runScenario(modifiers: any[], presetId: string) {
     setLoading(true);
@@ -30,7 +44,7 @@ export default function ScenariosPage() {
       const res = await fetch('/api/scenarios/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ incidentId: 'INC-001', modifiers }),
+        body: JSON.stringify({ incidentId: activeIncidentId, modifiers }),
       });
       const data = await res.json();
       setResult(data.data);
