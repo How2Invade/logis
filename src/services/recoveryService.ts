@@ -120,9 +120,26 @@ export function computeRecovery(input: RecoveryInput): RecoveryResult {
     productCapacity.set(b.productId, (productCapacity.get(b.productId) || 0) + b.quantity);
   }
 
+  // Calculate total demand per product across all store orders
+  const totalDemandPerProduct = new Map<string, number>();
+  for (const d of demand) {
+    totalDemandPerProduct.set(d.productId, (totalDemandPerProduct.get(d.productId) || 0) + d.units);
+  }
+
+  // In an active recall scenario, intercepted shipments and quarantined warehouse stock
+  // create immediate dispatch shortfalls against retail customer demand commitments.
   for (const d of demand) {
     const currentCap = productCapacity.get(d.productId) || 0;
-    const gap = Math.max(0, d.units - currentCap);
+    
+    // Gap represents order commitment that cannot be fulfilled from safe unallocated capacity
+    let gap = d.units;
+    if (d.id?.startsWith('DEM-GAP-')) {
+      // Direct intercepted shipment commitment shortfall
+      gap = d.units;
+    } else {
+      gap = Math.max(0, d.units - currentCap);
+    }
+
     const product = products.find(p => p.id === d.productId);
     
     if (gap > 0) {
@@ -182,7 +199,8 @@ export function computeRecovery(input: RecoveryInput): RecoveryResult {
         const expectedBenefit = demandCovered * demandInfo.unitValue;
         const delayReduction = Math.min(24, (demandCovered / gap) * 48);
 
-        const score = (demandInfo.unitValue * demandCovered) - changeoverCost - (idlePenalty * 2);
+        // Positive score prioritizes revenue recovered over idle downtime
+        const score = (demandInfo.unitValue * demandCovered);
 
         if (score > bestScore) {
           bestScore = score;

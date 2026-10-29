@@ -162,8 +162,45 @@ export function computeRecoveryPlan(incidentId: string): RecoveryResult {
     const trucks = db.prepare('SELECT * FROM trucks').all() as any[];
     const batches = db.prepare('SELECT * FROM batches').all() as any[];
     const products = db.prepare('SELECT * FROM products').all() as any[];
-    const demandRows = db.prepare('SELECT * FROM demand').all() as any[];
+    let demandRows = db.prepare('SELECT * FROM demand').all() as any[];
     const costRatesRows = db.prepare('SELECT * FROM cost_rates').all() as any[];
+
+    // If demand table is empty or for a simulation has no shortfall,
+    // construct demand gaps directly from intercepted shipments created by this incident
+    if (affectedBatchIds.length > 0) {
+      const placeholders = affectedBatchIds.map(() => '?').join(',');
+      const interceptedShipments = db.prepare(`
+        SELECT s.id, s.product_id, s.destination, s.quantity, s.departed_at, p.name as product_name, p.unit_price
+        FROM shipments s
+        JOIN products p ON p.id = s.product_id
+        WHERE s.batch_id IN (${placeholders})
+      `).all(...affectedBatchIds) as any[];
+
+      if (interceptedShipments.length > 0) {
+        // Group intercepted shipments by destination + product to represent concrete store gaps
+        const gapMap = new Map<string, { productId: string; units: number; deadline: string; unitValue: number }>();
+        for (const s of interceptedShipments) {
+          const key = `${s.destination}__${s.product_id}`;
+          const cur = gapMap.get(key) || {
+            productId: s.product_id,
+            units: 0,
+            deadline: s.departed_at ? s.departed_at.split('T')[0] : '2026-11-12',
+            unitValue: s.unit_price || 15,
+          };
+          cur.units += s.quantity;
+          gapMap.set(key, cur);
+        }
+
+        demandRows = Array.from(gapMap.entries()).map(([k, val], idx) => ({
+          id: `DEM-GAP-${String(idx + 1).padStart(3, '0')}`,
+          product_id: val.productId,
+          units: val.units,
+          deadline: val.deadline,
+          unit_value: val.unitValue,
+          priority: idx % 3 === 0 ? 'critical' : idx % 2 === 0 ? 'high' : 'medium',
+        }));
+      }
+    }
 
     const recovery = computeRecovery({
       affectedBatchIds,

@@ -449,24 +449,25 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // (c) machines: generate one machine row per unique production line in batches
+        // (c) machines: generate machine rows matching batches machine_id
         const machineCount = (db!.prepare('SELECT COUNT(*) as c FROM machines').get() as any).c;
         if (machineCount === 0 && validBatches.length > 0) {
           const insMachine = db!.prepare('INSERT INTO machines (id, name, capacity_per_day, compatible_products, utilization, available, status) VALUES (?, ?, ?, ?, ?, ?, ?)');
           const lineMap = new Map<string, { maxQty: number; productIds: Set<string> }>();
           for (const b of validBatches) {
-            const line = b.lineId || b.machineId || 'LINE-1';
-            const cur = lineMap.get(line) || { maxQty: 0, productIds: new Set<string>() };
+            const machineKey = b.machineId || b.lineId || 'LINE-1';
+            const cur = lineMap.get(machineKey) || { maxQty: 0, productIds: new Set<string>() };
             if (b.quantity > cur.maxQty) cur.maxQty = b.quantity;
             if (b.productId) cur.productIds.add(b.productId);
-            lineMap.set(line, cur);
+            lineMap.set(machineKey, cur);
           }
 
-          let mIdx = 1;
-          for (const [line, data] of lineMap.entries()) {
-            const mId = `M-${String(mIdx++).padStart(2, '0')}`;
-            const compPrds = JSON.stringify(Array.from(data.productIds));
-            insMachine.run(mId, `Production Line ${line}`, Math.max(1000, data.maxQty), compPrds, 0.80, 1, 'running');
+          // Gather all products in dataset so machines can change over
+          const allPrdIds = entities.products?.map(p => p.id) || [];
+
+          for (const [mKey, data] of lineMap.entries()) {
+            const compPrds = JSON.stringify(allPrdIds.length > 0 ? allPrdIds : Array.from(data.productIds));
+            insMachine.run(mKey, `Production Line ${mKey}`, 500, compPrds, 0.80, 1, 'running');
           }
         }
 
