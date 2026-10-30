@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import type { ResponsePlan, ResponseAction } from '@/lib/types';
 import { ACTION_TRACKER_STORAGE_KEY, ACTION_OWNERS as OWNERS, priorityLevelFor, type TrackedAction } from '@/lib/actionTracker';
+import CUSPanel from '@/components/CUSPanel';
+import CleanStockCard from '@/components/CleanStockCard';
 
 // Extend the Action type for UI state
 type ActionUIState = TrackedAction;
@@ -208,6 +210,14 @@ export default function ResponsePage() {
 
       {(plan || actions.length > 0) && !loading && (
         <>
+          {/* CUS: Contamination Urgency & Top Intercept Actions */}
+          {activeIncidentId && (
+            <div className="space-y-8 mb-8">
+              <CUSPanel incidentId={activeIncidentId} />
+              <CleanStockCard incidentId={activeIncidentId} />
+            </div>
+          )}
+
           {/* Section 4: Action Tracker Progress */}
           {actions.length > 0 && (
             <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
