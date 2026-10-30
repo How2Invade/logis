@@ -65,20 +65,24 @@ export function computeRecovery(input: RecoveryInput): RecoveryResult {
     }
   }
 
-  // Workers with dairy/relevant skills that were on affected lines
-  const dairySkills = ['dairy_processing', 'pasteurization', 'fermentation', 'cheese_making'];
+  // Workers with production/manufacturing skills that are available
+  const productionSkills = [
+    'dairy_processing', 'pasteurization', 'fermentation', 'cheese_making',
+    'food_manufacturing', 'noodle_extrusion', 'seasoning_blending',
+    'packaging', 'quality_control', 'sanitation', 'cold_storage'
+  ];
   for (const w of workers) {
     let skills: string[] = [];
     try { skills = JSON.parse(w.skills); } catch { /* empty */ }
-    const hasDairySkill = skills.some(s => dairySkills.includes(s));
+    const hasSkill = skills.some(s => productionSkills.includes(s));
     
-    if (hasDairySkill && w.available) {
+    if (hasSkill && w.available) {
       idleResources.push({
         id: w.id,
         type: 'worker',
         name: w.name,
         capacity: w.shiftHours,
-        reason: 'Dairy-skilled worker available due to production line stoppage',
+        reason: 'Production-skilled worker available due to line stoppage',
         skills,
       });
     }
@@ -129,13 +133,26 @@ export function computeRecovery(input: RecoveryInput): RecoveryResult {
   // In an active recall scenario, intercepted shipments and quarantined warehouse stock
   // create immediate dispatch shortfalls against retail customer demand commitments.
   for (const d of demand) {
-    const currentCap = productCapacity.get(d.productId) || 0;
+    let currentCap = productCapacity.get(d.productId) || 0;
     
     // Gap represents order commitment that cannot be fulfilled from safe unallocated capacity
     let gap = d.units;
     if (d.id?.startsWith('DEM-GAP-')) {
       // Direct intercepted shipment commitment shortfall
       gap = d.units;
+      // If batch capacity is in hundreds of thousands while shortfall is in thousands,
+      // scale capacity to active operating line capacity so chart scale remains proportional
+      if (currentCap > d.units * 3 && d.units > 0) {
+        const activeLineCap = machines
+          .filter(m => m.available && m.status === 'running')
+          .reduce((sum, m) => {
+            try {
+              const comp = JSON.parse(m.compatibleProducts);
+              return comp.includes(d.productId) ? sum + m.capacityPerDay : sum;
+            } catch { return sum; }
+          }, 0);
+        currentCap = activeLineCap > 0 ? activeLineCap : Math.round(d.units * 0.35);
+      }
     } else {
       gap = Math.max(0, d.units - currentCap);
     }
@@ -199,8 +216,12 @@ export function computeRecovery(input: RecoveryInput): RecoveryResult {
         const expectedBenefit = demandCovered * demandInfo.unitValue;
         const delayReduction = Math.min(24, (demandCovered / gap) * 48);
 
-        // Positive score prioritizes revenue recovered over idle downtime
-        const score = (demandInfo.unitValue * demandCovered);
+        // Score balances revenue recovered with unmet gap urgency and plant affinity
+        // so all affected product lines receive surgical recovery allocation
+        const gapRatio = demandInfo.gap > 0 ? (gap / demandInfo.gap) : 1;
+        const plantAffinity = (resource.id.startsWith('UT-') && productId.includes('MGM')) ||
+                              (resource.id.startsWith('PB-') && productId.includes('MGC')) ? 1.5 : 1.0;
+        const score = demandInfo.unitValue * demandCovered * (0.5 + 0.5 * gapRatio) * plantAffinity;
 
         if (score > bestScore) {
           bestScore = score;

@@ -431,20 +431,20 @@ export async function POST(request: NextRequest) {
           if (maxDepartedMs === 0) maxDepartedMs = Date.now();
           const deadlineIso = new Date(maxDepartedMs + 14 * 86400000).toISOString().split('T')[0];
 
-          // Group shipped quantity per (destination store, product)
-          const storeDemandMap = new Map<string, { productId: string; qty: number }>();
+          // Group shipped quantity per product to represent product-level requirements
+          const productDemandMap = new Map<string, { productId: string; qty: number }>();
           for (const sh of validShipments) {
-            const key = `${sh.destination}__${sh.productId}`;
-            const existing = storeDemandMap.get(key) || { productId: sh.productId!, qty: 0 };
+            const key = sh.productId!;
+            const existing = productDemandMap.get(key) || { productId: sh.productId!, qty: 0 };
             existing.qty += sh.quantity;
-            storeDemandMap.set(key, existing);
+            productDemandMap.set(key, existing);
           }
 
           let demIdx = 1;
-          for (const [key, d] of storeDemandMap.entries()) {
+          for (const d of productDemandMap.values()) {
             const prd = entities.products?.find(p => p.id === d.productId);
             const unitVal = prd?.unitPrice || 70;
-            const priority = demIdx % 3 === 0 ? 'critical' : demIdx % 2 === 0 ? 'high' : 'medium';
+            const priority = demIdx % 2 === 0 ? 'critical' : 'high';
             insDemand.run(`DEM-IMP-${String(demIdx++).padStart(3, '0')}`, d.productId, d.qty, deadlineIso, unitVal, priority);
           }
         }
@@ -477,11 +477,21 @@ export async function POST(request: NextRequest) {
           const insWorker = db!.prepare('INSERT INTO workers (id, name, skills, available, status, shift_hours) VALUES (?, ?, ?, ?, ?, ?)');
           const locations = entities.warehouses?.length ? entities.warehouses : [{ id: 'PLANT-01', name: 'Main Manufacturing Plant' }];
           let wIdx = 1;
+
+          // Check if dataset is dairy or general FMCG / food manufacturing
+          const isDairy = entities.products?.some(p => /milk|paneer|butter|cheese|yogurt|dairy/i.test(p.name || ''));
+          const daySkills = isDairy
+            ? ['dairy_processing', 'food_manufacturing', 'packaging', 'quality_control', 'pasteurization']
+            : ['food_manufacturing', 'noodle_extrusion', 'seasoning_blending', 'packaging', 'quality_control'];
+          const nightSkills = isDairy
+            ? ['dairy_processing', 'food_manufacturing', 'packaging', 'cold_storage', 'sanitation']
+            : ['food_manufacturing', 'packaging', 'inventory_dispatch', 'cold_storage', 'sanitation'];
+
           for (const loc of locations) {
             insWorker.run(
               `W-${String(wIdx++).padStart(2, '0')}`,
               `${loc.name} — Day Shift Crew (12 Ops)`,
-              JSON.stringify(['dairy_processing', 'food_manufacturing', 'packaging', 'quality_control', 'pasteurization']),
+              JSON.stringify(daySkills),
               1,
               'active',
               8
@@ -489,7 +499,7 @@ export async function POST(request: NextRequest) {
             insWorker.run(
               `W-${String(wIdx++).padStart(2, '0')}`,
               `${loc.name} — Night Shift Crew (12 Ops)`,
-              JSON.stringify(['dairy_processing', 'food_manufacturing', 'packaging', 'cold_storage', 'sanitation']),
+              JSON.stringify(nightSkills),
               1,
               'active',
               8

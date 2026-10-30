@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { cn, formatNumber, formatCurrency } from '@/lib/utils';
 import { Wrench, Users, Warehouse, Truck, ChevronRight, Play, ArrowRight } from 'lucide-react';
 import type { RecoveryResult } from '@/lib/types';
@@ -25,6 +25,12 @@ export default function RecoveryPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (activeIncidentId) {
+      generatePlan();
+    }
+  }, [activeIncidentId]);
+
   async function generatePlan() {
     setLoading(true);
     try {
@@ -39,11 +45,70 @@ export default function RecoveryPage() {
     toast.success('Recovery plan applied successfully', { description: 'Resources have been reallocated. Timeline and audit log updated.' });
   }
 
-  const demandData = recovery?.unmetDemand.map(d => ({
-    name: d.productName.substring(0, 15) + (d.productName.length > 15 ? '...' : ''),
-    'Current Capacity': d.currentCapacity,
-    'Unmet Demand Gap': d.gap,
-  })) || [];
+  // Aggregate demand gaps by product so the chart displays clean, product-level capacity vs unmet gap
+  const demandData = useMemo(() => {
+    if (!recovery?.unmetDemand) return [];
+    const productMap = new Map<string, { name: string; capacity: number; gap: number }>();
+    
+    for (const d of recovery.unmetDemand) {
+      const existing = productMap.get(d.productId);
+      const shortName = d.productName
+        .replace(/^Product [A-Z] - /, '')
+        .replace(/^Maggi 2-Minute Noodles /, 'Noodles ')
+        .replace(/^Maggi /, '');
+
+      if (!existing) {
+        productMap.set(d.productId, {
+          name: shortName,
+          capacity: d.currentCapacity,
+          gap: d.gap,
+        });
+      } else {
+        existing.gap += d.gap;
+      }
+    }
+
+    return Array.from(productMap.values()).map(p => ({
+      name: p.name.length > 24 ? p.name.substring(0, 22) + '...' : p.name,
+      'Current Capacity': p.capacity,
+      'Unmet Demand Gap': p.gap,
+    }));
+  }, [recovery?.unmetDemand]);
+
+  // Clean product-level aggregation for Unmet Demand Details
+  const aggregatedDemandDetails = useMemo(() => {
+    if (!recovery?.unmetDemand) return [];
+    const map = new Map<string, {
+      productId: string;
+      productName: string;
+      demandUnits: number;
+      gap: number;
+      totalValue: number;
+      deadline: string;
+    }>();
+
+    for (const d of recovery.unmetDemand) {
+      const existing = map.get(d.productId);
+      if (!existing) {
+        map.set(d.productId, {
+          productId: d.productId,
+          productName: d.productName,
+          demandUnits: d.demandUnits,
+          gap: d.gap,
+          totalValue: d.totalValue,
+          deadline: d.deadline,
+        });
+      } else {
+        existing.demandUnits += d.demandUnits;
+        existing.gap += d.gap;
+        existing.totalValue += d.totalValue;
+        if (d.deadline < existing.deadline) {
+          existing.deadline = d.deadline;
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.totalValue - a.totalValue);
+  }, [recovery?.unmetDemand]);
 
   return (
     <div className="px-8 lg:px-10 py-7 max-w-[1400px] mx-auto space-y-6 min-h-screen text-foreground transition-colors duration-300">
@@ -118,8 +183,8 @@ export default function RecoveryPage() {
             {/* Unmet Demand Details */}
             <div className="rounded-2xl border border-border bg-surface p-6 shadow-sm flex flex-col transition-colors duration-300 h-full overflow-hidden">
               <h3 className="text-[16px] font-semibold text-foreground mb-4">Unmet Demand Details</h3>
-              <div className="flex-1 overflow-y-auto pr-2 space-y-3">
-                {recovery.unmetDemand.map((d, idx) => (
+              <div className="flex-1 overflow-y-auto pr-2 space-y-3 max-h-[256px]">
+                {aggregatedDemandDetails.map((d: any, idx: number) => (
                   <div key={`${d.productId}-${d.deadline}-${idx}`} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-surface-2/50 border border-border rounded-xl transition-colors">
                     <div className="mb-2 sm:mb-0">
                       <div className="text-[14px] font-semibold text-foreground mb-1">{d.productName}</div>

@@ -177,10 +177,10 @@ export function computeRecoveryPlan(incidentId: string): RecoveryResult {
       `).all(...affectedBatchIds) as any[];
 
       if (interceptedShipments.length > 0) {
-        // Group intercepted shipments by destination + product to represent concrete store gaps
+        // Group intercepted shipments by product to represent clean product-level retail demand shortfalls
         const gapMap = new Map<string, { productId: string; units: number; deadline: string; unitValue: number }>();
         for (const s of interceptedShipments) {
-          const key = `${s.destination}__${s.product_id}`;
+          const key = s.product_id;
           const cur = gapMap.get(key) || {
             productId: s.product_id,
             units: 0,
@@ -188,16 +188,19 @@ export function computeRecoveryPlan(incidentId: string): RecoveryResult {
             unitValue: s.unit_price || 15,
           };
           cur.units += s.quantity;
+          if (s.departed_at && s.departed_at.split('T')[0] < cur.deadline) {
+            cur.deadline = s.departed_at.split('T')[0];
+          }
           gapMap.set(key, cur);
         }
 
-        demandRows = Array.from(gapMap.entries()).map(([k, val], idx) => ({
+        demandRows = Array.from(gapMap.values()).map((val, idx) => ({
           id: `DEM-GAP-${String(idx + 1).padStart(3, '0')}`,
           product_id: val.productId,
           units: val.units,
           deadline: val.deadline,
           unit_value: val.unitValue,
-          priority: idx % 3 === 0 ? 'critical' : idx % 2 === 0 ? 'high' : 'medium',
+          priority: 'critical',
         }));
       }
     }
