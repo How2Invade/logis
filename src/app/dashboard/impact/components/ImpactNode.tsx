@@ -1,3 +1,4 @@
+import React, { memo } from 'react';
 import { Handle, Position, useStore } from '@xyflow/react';
 import { cn } from '@/lib/utils';
 import { ClassificationStatus, NodeType } from '@/lib/types';
@@ -31,9 +32,9 @@ function getRiskBadgeStyle(score: number): React.CSSProperties {
   return { background: 'rgba(111, 166, 135, 0.15)', color: 'var(--color-success)', border: '1px solid rgba(111, 166, 135, 0.4)' };
 }
 
-export function ImpactNode({ data, id }: any) {
-  // Read zoom level from ReactFlow store
-  const zoom = useStore(state => state.transform[2]);
+export const ImpactNode = memo(function ImpactNode({ data, id }: any) {
+  // Select ONLY boolean threshold so continuous zoom animations do not re-render nodes every frame!
+  const showDetail = useStore(s => s.transform[2] >= 0.7);
   
   const type = data.type as NodeType;
   const status = data.status as ClassificationStatus;
@@ -46,8 +47,6 @@ export function ImpactNode({ data, id }: any) {
   
   const Icon = icons[type] || Package;
   const styles = statusStyles[status] || statusStyles.not_relevant;
-  
-  const showDetail = zoom >= 0.7; // Intelligent zoom
 
   // Amber glow applies to uncertain nodes when prediction mode is active
   const showAmberGlow = predictionMode && status === 'uncertain' && !isMuted;
@@ -112,4 +111,15 @@ export function ImpactNode({ data, id }: any) {
       <Handle type="source" position={Position.Right} className="w-2 h-2 !bg-muted-foreground/50 border-none" />
     </div>
   );
-}
+}, (prev, next) => {
+  return (
+    prev.id === next.id &&
+    prev.data.label === next.data.label &&
+    prev.data.status === next.data.status &&
+    prev.data.isSelected === next.data.isSelected &&
+    prev.data.isMuted === next.data.isMuted &&
+    prev.data.isAnimating === next.data.isAnimating &&
+    prev.data.predictionMode === next.data.predictionMode &&
+    prev.data.aiRiskScore === next.data.aiRiskScore
+  );
+});

@@ -295,34 +295,37 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
           ...e.style,
           stroke: e.data.baseStroke,
           strokeWidth: e.data.baseWidth,
-          opacity: isPathEdge ? 0.05 : 0.01,
-          transition: 'opacity 0.4s ease, stroke-width 0.4s ease'
+          opacity: isPathEdge ? 0.08 : 0.02,
+          transition: isPathEdge ? 'opacity 0.3s ease, stroke-width 0.3s ease' : undefined
         },
         markerEnd: { type: MarkerType.ArrowClosed, color: e.data.baseStroke }
       };
     }));
 
-    // 3. Wait briefly for the details panel to close (250ms), then start propagation
+    // 3. Wait briefly for the details panel to close (200ms), then start propagation
     const startTimer = setTimeout(() => {
       const totalSteps = path.length;
 
       path.forEach((currNodeId, idx) => {
         const t = setTimeout(() => {
-          
           setTraceProgress(Math.round(((idx + 1) / totalSteps) * 100));
           setActiveTraceNodeId(currNodeId);
 
           const nodeObj = getNodes().find(n => n.id === currNodeId);
           if (nodeObj) {
-            fitView({ nodes: [nodeObj], padding: 1.2, duration: 800, maxZoom: 1.5 });
+            setCenter(nodeObj.position.x + 90, nodeObj.position.y + 40, { zoom: 1.25, duration: 800 });
           }
 
-          // Activate node
-          setNodes(nds => nds.map(n => 
-            n.id === currNodeId
-              ? { ...n, data: { ...n.data, isAnimating: true } }
-              : n
-          ));
+          // Activate current node and deactivate previous
+          setNodes(nds => nds.map(n => {
+            if (n.id === currNodeId) {
+              return { ...n, data: { ...n.data, isAnimating: true } };
+            }
+            if (n.data.isAnimating) {
+              return { ...n, data: { ...n.data, isAnimating: false } };
+            }
+            return n;
+          }));
 
           // Activate edge to next node
           if (idx < totalSteps - 1) {
@@ -334,9 +337,9 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
                   animated: true,
                   style: {
                     ...e.style,
-                    strokeWidth: e.data.baseWidth + 1.5,
+                    strokeWidth: e.data.baseWidth + 2,
                     opacity: 1, // Edge lights up
-                    transition: 'opacity 0.4s ease, stroke-width 0.4s ease'
+                    transition: 'opacity 0.3s ease, stroke-width 0.3s ease'
                   }
                 };
               }
@@ -344,38 +347,30 @@ function ImpactFlow({ impact, predictionMode }: { impact: ImpactResult; predicti
             }));
           }
 
-          // Turn off the node pulse after a short duration
-          const offTimer = setTimeout(() => {
-            setNodes(nds => nds.map(n => 
-              n.id === currNodeId
-                ? { ...n, data: { ...n.data, isAnimating: false } }
-                : n
-            ));
-          }, 1000);
-          sweepTimersRef.current.push(offTimer);
-
           // Finish trace
           if (idx === totalSteps - 1) {
             const endTimer = setTimeout(() => {
               setTraceProgress(null);
               setActiveTraceNodeId(null);
+              // Clean up any remaining isAnimating flags
+              setNodes(nds => nds.map(n => n.data.isAnimating ? { ...n, data: { ...n.data, isAnimating: false } } : n));
               // Zoom out slightly to show just the traced path
               const pathNodes = getNodes().filter(n => activeIds.has(n.id));
               if (pathNodes.length > 0) {
                 fitView({ nodes: pathNodes, padding: 0.3, duration: 800 });
               }
-            }, 1500);
+            }, 1200);
             sweepTimersRef.current.push(endTimer);
           }
 
-        }, idx * 1200); // 1.2s delay between steps for smooth zooming
+        }, idx * 1200); // 1.2s delay between steps for smooth presentation speed
         sweepTimersRef.current.push(t);
       });
-    }, 250);
+    }, 200);
     
     sweepTimersRef.current.push(startTimer);
 
-  }, [impact.edges, impact.nodes, setNodes, setEdges, getNodes, fitView]);
+  }, [impact.edges, impact.nodes, setNodes, setEdges, getNodes, fitView, setCenter]);
 
   const handleSnapshot = async () => {
     const reactFlowWrapper = document.querySelector('.react-flow') as HTMLElement;
