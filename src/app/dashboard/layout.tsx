@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, AlertTriangle, Map, ShieldCheck, Wrench,
-  BarChart3, Settings, Truck, Layers, Activity
+  BarChart3, Settings, Truck, Layers, Activity, BrainCircuit
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ModeToggle } from '@/components/mode-toggle';
@@ -32,6 +32,7 @@ const navGroups = [
   {
     title: 'REPORT',
     items: [
+      { href: '/dashboard/analytics', icon: BrainCircuit, label: 'Analytics' },
       { href: '/dashboard/reports', icon: BarChart3, label: 'Reports' },
       { href: '/dashboard/settings', icon: Settings, label: 'Settings' },
     ]

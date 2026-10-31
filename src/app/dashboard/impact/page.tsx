@@ -1,15 +1,21 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, Suspense, lazy } from 'react';
 import { ReactFlow, Background, Controls, MiniMap, Panel, useNodesState, useEdgesState, MarkerType, useReactFlow, ReactFlowProvider, getNodesBounds } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from 'dagre';
 import { cn, formatNumber } from '@/lib/utils';
 import type { ImpactResult, GraphNode as GNode, GraphEdge as GEdge } from '@/lib/types';
-import { X, AlertTriangle, Crosshair, Map as MapIcon, Play, Sparkles, Download, Camera } from 'lucide-react';
+import { X, AlertTriangle, Crosshair, Map as MapIcon, Play, Sparkles, Download, Camera, GitBranch, Boxes } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { jsPDF } from 'jspdf';
 import { ImpactNode } from './components/ImpactNode';
+
+const NetworkTwin = lazy(() =>
+  import('./components/twin/NetworkTwin').then((m) => ({ default: m.NetworkTwin }))
+);
+
+type TabId = 'map' | 'twin';
 
 const nodeTypes = {
   impactNode: ImpactNode,
@@ -650,6 +656,7 @@ export default function ImpactMapPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [predictionMode, setPredictionMode] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>('map');
 
   useEffect(() => {
     async function runAnalysis() {
@@ -700,66 +707,106 @@ export default function ImpactMapPage() {
 
   return (
     <div className="px-8 lg:px-10 py-7 max-w-[1400px] mx-auto h-[calc(100vh-3.5rem)] flex flex-col space-y-5 text-foreground transition-colors duration-300">
-      <div className="shrink-0 flex items-center justify-between">
+      {/* Header */}
+      <div className="shrink-0 flex items-start justify-between gap-4">
         <div>
           <h1 className="text-[32px] font-semibold text-foreground mb-1">Impact Analysis</h1>
           <p className="text-[14px] text-muted-foreground">Interactive map of upstream sources and downstream contamination spread</p>
         </div>
 
-        {/* AI Prediction Mode toggle */}
-        <button
-          onClick={() => setPredictionMode(p => !p)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 18px',
-            borderRadius: '999px',
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 200ms ease',
-            border: predictionMode
-              ? '1px solid rgba(209, 154, 67, 0.55)'
-              : '1px solid var(--color-border)',
-            background: predictionMode
-              ? 'rgba(209, 154, 67, 0.13)'
-              : 'var(--color-surface-2)',
-            color: predictionMode
-              ? 'var(--color-warning)'
-              : 'var(--color-muted-foreground)',
-            boxShadow: predictionMode
-              ? '0 0 0 3px rgba(209, 154, 67, 0.12)'
-              : 'none',
-          }}
-        >
-          <Sparkles
+        {/* AI Prediction Mode toggle — map tab only */}
+        {activeTab === 'map' && (
+          <button
+            onClick={() => setPredictionMode(p => !p)}
             style={{
-              width: '15px',
-              height: '15px',
-              color: predictionMode ? 'var(--color-warning)' : 'var(--color-muted-foreground)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 18px',
+              borderRadius: '999px',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 200ms ease',
+              border: predictionMode
+                ? '1px solid rgba(209, 154, 67, 0.55)'
+                : '1px solid var(--color-border)',
+              background: predictionMode
+                ? 'rgba(209, 154, 67, 0.13)'
+                : 'var(--color-surface-2)',
+              color: predictionMode
+                ? 'var(--color-warning)'
+                : 'var(--color-muted-foreground)',
+              boxShadow: predictionMode
+                ? '0 0 0 3px rgba(209, 154, 67, 0.12)'
+                : 'none',
             }}
-          />
-          {predictionMode ? 'AI Prediction: ON' : 'AI Prediction Mode'}
-          {predictionMode && (
-            <span
+          >
+            <Sparkles
               style={{
-                display: 'inline-block',
-                width: '7px',
-                height: '7px',
-                borderRadius: '50%',
-                background: 'var(--color-warning)',
-                animation: 'amber-glow 1.8s ease-in-out infinite',
+                width: '15px',
+                height: '15px',
+                color: predictionMode ? 'var(--color-warning)' : 'var(--color-muted-foreground)',
               }}
             />
+            {predictionMode ? 'AI Prediction: ON' : 'AI Prediction Mode'}
+            {predictionMode && (
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: '7px',
+                  height: '7px',
+                  borderRadius: '50%',
+                  background: 'var(--color-warning)',
+                  animation: 'amber-glow 1.8s ease-in-out infinite',
+                }}
+              />
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* Tab switcher */}
+      <div className="shrink-0 flex items-center gap-1 p-1 bg-surface rounded-xl border border-border w-fit">
+        <button
+          onClick={() => setActiveTab('map')}
+          className={cn(
+            'flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-semibold transition-colors',
+            activeTab === 'map' ? 'bg-dark-action text-dark-action-fg shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-surface-2'
           )}
+        >
+          <GitBranch className="w-4 h-4" /> Impact Network Graph
+        </button>
+        <button
+          onClick={() => setActiveTab('twin')}
+          className={cn(
+            'flex items-center gap-2 rounded-lg px-4 py-2 text-[13px] font-semibold transition-colors',
+            activeTab === 'twin' ? 'bg-dark-action text-dark-action-fg shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-surface-2'
+          )}
+        >
+          <Boxes className="w-4 h-4" /> 3D Digital Twin
         </button>
       </div>
 
+      {/* Tab content */}
       <div className="flex-1 min-h-0 relative">
-        <ReactFlowProvider>
-          <ImpactFlow impact={impact} predictionMode={predictionMode} />
-        </ReactFlowProvider>
+        {activeTab === 'map' ? (
+          <ReactFlowProvider>
+            <ImpactFlow impact={impact} predictionMode={predictionMode} />
+          </ReactFlowProvider>
+        ) : (
+          <div className="w-full h-full rounded-2xl border border-border overflow-hidden shadow-sm">
+            <Suspense
+              fallback={
+                <div className="w-full h-full flex items-center justify-center bg-background">
+                  <div className="text-sm font-medium text-muted-foreground">Loading 3D scene…</div>
+                </div>
+              }
+            >
+              <NetworkTwin />
+            </Suspense>
+          </div>
+        )}
       </div>
     </div>
   );
