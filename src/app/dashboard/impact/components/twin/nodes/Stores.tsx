@@ -148,7 +148,7 @@ export function Stores({ stores, state, selectedId, onSelect }: StoresProps) {
       <instancedMesh ref={crates} args={[boxGeo(0.8, 0.78, 0.8), undefined, n * CRATES]} material={mat('#ffffff', 0.7)} castShadow dispose={null} />
       <instancedMesh ref={ring} args={[ringGeo(3.4, 4), undefined, n]} material={ringMat} renderOrder={1} dispose={null} />
       {stores.map(({ node, placement }) => (
-        <NodeLabel key={node.id} node={node} state={state} x={placement.x} z={placement.z} y={4} minZoom={2} selected={selectedId === node.id} />
+        <NodeLabel key={node.id} node={node} state={state} x={placement.x} z={placement.z} y={4} minZoom={7} selected={selectedId === node.id} />
       ))}
     </>
   );

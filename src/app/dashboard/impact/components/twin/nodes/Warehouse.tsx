@@ -30,7 +30,7 @@ function Forklift({ phase, color, dark }: { phase: number; color: string; dark: 
   );
 }
 
-export function Warehouse({ node, placement, state, selected, onSelect }: NodeProps) {
+export function Warehouse({ node, placement, state, selected, onSelect, onOpen }: NodeProps & { onOpen: (id: string) => void }) {
   const p = state.palette;
   const { solid, glow } = useToneMaterials(node, state);
   const pallets = useRef<THREE.InstancedMesh>(null);
@@ -68,12 +68,12 @@ export function Warehouse({ node, placement, state, selected, onSelect }: NodePr
       }
       mesh.instanceColor.needsUpdate = true;
     }
-    if (detail.current) detail.current.visible = state.view.zoomRatio >= 2.2;
+    if (detail.current) detail.current.visible = state.view.zoom >= 10;
   });
 
   return (
     <>
-      <group position={[placement.x, 0, placement.z]} rotation={[0, placement.rot, 0]} {...pickHandlers(node.id, state, onSelect)}>
+      <group position={[placement.x, 0, placement.z]} rotation={[0, placement.rot, 0]} {...pickHandlers(node.id, state, onSelect)} onDoubleClick={(e) => { e.stopPropagation(); onOpen(node.id); }}>
         <Box size={[15, 0.06, 13.5]} color={p.concrete} position={[0, 0.21, 0]} />
         <Box size={[12, 5, 8]} color={p.blue} position={[0, 2.7, -1]} cast />
         <Box size={[12.35, 0.25, 8.35]} material={solid} position={[0, 5.1, -1]} />

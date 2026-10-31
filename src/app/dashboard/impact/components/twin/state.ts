@@ -10,9 +10,10 @@ export interface TracePlan {
   order: string[];
   levels: TraceLevel[];
   duration: number;
-  logisSegments: Array<Segment & { at: number }>;
-  naiveSegments: Segment[];
+  segments: Array<Segment & { at: number }>;
 }
+
+export type TracePlans = Record<ViewMode, TracePlan>;
 
 export interface TwinState {
   mode: ViewMode;
@@ -21,8 +22,19 @@ export interface TwinState {
   held: Set<string>;
   truckPos: Map<string, { x: number; z: number; yaw: number }>;
   palette: Palette;
-  view: { zoomRatio: number };
+  view: { zoomRatio: number; zoom: number };
   hovered: string | null;
+  labels: Map<string, LabelSlot>;
+}
+
+export interface LabelSlot {
+  x: number;
+  y: number;
+  z: number;
+  aspect: number;
+  priority: number;
+  want: boolean;
+  allowed: boolean;
 }
 
 export type Selection = { kind: 'node' | 'truck'; id: string } | null;
@@ -30,9 +42,12 @@ export type Selection = { kind: 'node' | 'truck'; id: string } | null;
 const HOP = 0.9;
 const STAGGER = 0.09;
 
-export function buildTracePlan(data: NetworkMap, layout: CityLayout): TracePlan {
+function buildPlan(data: NetworkMap, layout: CityLayout, mode: ViewMode): TracePlan {
   const byId = new Map(data.nodes.map((n) => [n.id, n]));
-  const hit = (n: MapNode) => toneFor(n, 'logis') === 'affected' || toneFor(n, 'logis') === 'uncertain';
+  const hit = (n: MapNode) => {
+    const t = toneFor(n, mode);
+    return t === 'affected' || t === 'uncertain';
+  };
   const tiers: MapNode[][] = [
     data.nodes.filter((n) => n.isSource),
     data.nodes.filter((n) => n.kind === 'plant'),
@@ -49,41 +64,35 @@ export function buildTracePlan(data: NetworkMap, layout: CityLayout): TracePlan 
     if (pts.length) {
       levels.push({ time: t, x: pts.reduce((s, p) => s + p.x, 0) / pts.length, z: pts.reduce((s, p) => s + p.z, 0) / pts.length });
     }
+    // big networks reveal a tier within ~2.5s instead of one node at a time
+    const stagger = Math.min(STAGGER, 2.5 / tier.length);
     tier.forEach((n, k) => {
-      revealAt.set(n.id, t + k * STAGGER);
+      revealAt.set(n.id, t + k * stagger);
       order.push(n.id);
     });
-    t += HOP + tier.length * STAGGER;
+    t += HOP + tier.length * stagger;
   }
 
-  const logisSegments: Array<Segment & { at: number }> = [];
-  const naiveSegments: Segment[] = [];
-  const seenL = new Set<string>();
-  const seenN = new Set<string>();
+  const segments: Array<Segment & { at: number }> = [];
+  const seen = new Set<string>();
   const segKey = (s: Segment) => `${s.x1.toFixed(1)},${s.z1.toFixed(1)},${s.x2.toFixed(1)},${s.z2.toFixed(1)}`;
   for (const e of data.edges) {
-    const from = byId.get(e.from);
-    const to = byId.get(e.to);
-    if (!from || !to) continue;
+    if (!byId.has(e.from) || !byId.has(e.to) || !revealAt.has(e.from) || !revealAt.has(e.to)) continue;
     const route = routeBetween(layout, e.from, e.to);
     if (!route) continue;
-    const segs = centerSegments(route.tiles, route.start, route.end);
-    const inLogis = revealAt.has(e.from) && revealAt.has(e.to);
-    const inNaive = (from.isSource || from.kind !== 'supplier') && (to.kind === 'plant' || to.units.naiveRecall > 0);
-    for (const s of segs) {
+    for (const s of centerSegments(layout, route)) {
       const k = segKey(s);
-      if (inLogis && !seenL.has(k)) {
-        seenL.add(k);
-        logisSegments.push({ ...s, at: revealAt.get(e.to) ?? 0 });
-      }
-      if (inNaive && !seenN.has(k)) {
-        seenN.add(k);
-        naiveSegments.push(s);
-      }
+      if (seen.has(k)) continue;
+      seen.add(k);
+      segments.push({ ...s, at: revealAt.get(e.to) ?? 0 });
     }
   }
-  logisSegments.sort((a, b) => a.at - b.at);
-  return { revealAt, order, levels, duration: t, logisSegments, naiveSegments };
+  segments.sort((a, b) => a.at - b.at);
+  return { revealAt, order, levels, duration: t, segments };
+}
+
+export function buildTracePlans(data: NetworkMap, layout: CityLayout): TracePlans {
+  return { logis: buildPlan(data, layout, 'logis'), naive: buildPlan(data, layout, 'naive') };
 }
 
 export function displayTone(state: TwinState, node: MapNode): Tone | 'neutral' {

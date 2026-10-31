@@ -29,6 +29,31 @@ export interface Palette {
   tone: Record<Tone, string>;
   neutral: string;
   route: string;
+  site: SitePalette;
+}
+
+export interface SitePalette {
+  yard: string;
+  road: string;
+  line: string;
+  wall: string;
+  rib: string;
+  roof: string;
+  doorFrame: string;
+  interior: string;
+  rack: string;
+  beam: string;
+  wood: string;
+  loads: [string, string, string];
+  pad: string;
+  charger: string;
+  container: string;
+  liveries: [string, string, string];
+  tire: string;
+  glass: string;
+  skin: string;
+  vest: string;
+  sign: { bg: string; fg: string; sub: string };
 }
 
 export function makePalette(isDark: boolean): Palette {
@@ -60,6 +85,13 @@ export function makePalette(isDark: boolean): Palette {
       tone: { affected: '#d66a61', uncertain: '#d19a43', safe: '#6fa687', idle: '#5d5a55' },
       neutral: '#6b6863',
       route: '#5b8cff',
+      site: {
+        yard: '#262624', road: '#1d1d1c', line: '#c9a227', wall: '#3b3e45', rib: '#33363c', roof: '#3b5fd6',
+        doorFrame: '#4a6fe6', interior: '#111215', rack: '#3b5fd6', beam: '#d9822a', wood: '#8a6a48',
+        loads: ['#b98d58', '#c9ccd3', '#3b63d6'], pad: '#22352a', charger: '#d4d7dd', container: '#1f8a7e',
+        liveries: ['#3b5fd6', '#1f8a7e', '#2a3a74'], tire: '#0e0f11', glass: '#0f1626', skin: '#e0b48c', vest: '#e8742c',
+        sign: { bg: '#1e1e1e', fg: '#f5f3ef', sub: '#a29e97' },
+      },
     };
   }
   return {
@@ -89,6 +121,13 @@ export function makePalette(isDark: boolean): Palette {
     tone: { affected: '#c85a52', uncertain: '#c58a32', safe: '#4f8a68', idle: '#b8b2a7' },
     neutral: '#c9c3b8',
     route: '#2f5be0',
+    site: {
+      yard: '#eef0f5', road: '#d3d7e3', line: '#f2c230', wall: '#e3e6ed', rib: '#d2d7e1', roof: '#3b6fe0',
+      doorFrame: '#2f5be0', interior: '#8d96a8', rack: '#2f5be0', beam: '#f08a24', wood: '#c8945c',
+      loads: ['#dcab70', '#f1f3f7', '#3b6fe0'], pad: '#d6efdf', charger: '#ffffff', container: '#2bb3a3',
+      liveries: ['#2f5be0', '#1f9a8a', '#1d2a5a'], tire: '#22252c', glass: '#1b2333', skin: '#e9b98f', vest: '#f07f2c',
+      sign: { bg: '#ffffff', fg: '#1d2433', sub: '#6b7488' },
+    },
   };
 }
 

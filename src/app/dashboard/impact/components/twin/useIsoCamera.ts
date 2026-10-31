@@ -49,17 +49,18 @@ export function resetView(c: CamController): void {
   c.azT = Math.round((c.azT - Math.PI / 4) / (Math.PI * 2)) * Math.PI * 2 + Math.PI / 4;
 }
 
-export function useIsoCamera(c: CamController, width: number): void {
+export function useIsoCamera(c: CamController, width: number, height: number, span: number): void {
   const camera = useThree((s) => s.camera);
   const gl = useThree((s) => s.gl);
 
   useEffect(() => {
-    const base = clamp(width / 240, 2.2, 9);
+    // fit the iso footprint of the whole map: its diagonal projects to ~0.71·span wide, ~0.41·span tall
+    const base = clamp(Math.min(width / (span * 0.6), (height - 110) / (span * 0.36)), 0.8, 9);
     const first = c.zoom === 0;
     c.zoomT = first ? base : c.zoomT * (base / c.base);
     c.base = base;
     if (first) c.zoom = base;
-  }, [c, width]);
+  }, [c, width, height, span]);
 
   useEffect(() => {
     const el = gl.domElement;

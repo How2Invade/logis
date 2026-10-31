@@ -48,8 +48,8 @@ export function buildTruckRuns(shipments: MapShipment[], layout: CityLayout): Tr
   shipments.forEach((s, k) => {
     const r = routeBetween(layout, s.origin, s.destination);
     if (!r) return;
-    const fwd = lanePolyline(r.tiles, r.start, r.end);
-    const back = lanePolyline([...r.tiles].reverse(), r.end, r.start);
+    const fwd = lanePolyline(layout, r.tiles, r.start, r.end);
+    const back = lanePolyline(layout, [...r.tiles].reverse(), r.end, r.start);
     const fwdCum = cumulative(fwd);
     const backCum = cumulative(back);
     const total = fwdCum[fwdCum.length - 1];

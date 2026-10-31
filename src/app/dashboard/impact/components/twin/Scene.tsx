@@ -9,8 +9,8 @@ import { Warehouse } from './nodes/Warehouse';
 import { Stores } from './nodes/Stores';
 import { Vehicles, type TruckRun } from './Vehicles';
 import { SelectionMarker } from './Selection';
+import { LabelDeclutter } from './nodes/NodeDecor';
 import { useIsoCamera, flyTo, type CamController } from './useIsoCamera';
-import { disposeCaches } from './primitives';
 import type { CityLayout } from './cityLayout';
 import type { Selection, TwinState } from './state';
 
@@ -22,6 +22,7 @@ interface SceneProps {
   ctrl: CamController;
   selection: Selection;
   onSelect: (s: Selection) => void;
+  onOpenSite: (id: string) => void;
   onTraceProgress: (revealed: number) => void;
   onTraceDone: () => void;
 }
@@ -62,14 +63,18 @@ function TraceDriver({ state, ctrl, onTraceProgress, onTraceDone }: Pick<ScenePr
 
 function Rig({ ctrl, state, layout }: { ctrl: CamController; state: TwinState; layout: CityLayout }) {
   const width = useThree((s) => s.size.width);
+  const height = useThree((s) => s.size.height);
+  const b = layout.bounds;
+  const span = b.maxX - b.minX + (b.maxZ - b.minZ);
   const gl = useThree((s) => s.gl);
   useEffect(() => {
     ctrl.bounds = layout.bounds;
   }, [ctrl, layout]);
-  useIsoCamera(ctrl, width);
+  useIsoCamera(ctrl, width, height, span);
   const frames = useRef(0);
   useFrame(() => {
     state.view.zoomRatio = ctrl.zoom / ctrl.base;
+    state.view.zoom = ctrl.zoom;
     if (++frames.current % 30 === 0) gl.domElement.dataset.calls = String(gl.info.render.calls);
   });
   return null;
@@ -84,7 +89,6 @@ export function Scene(props: SceneProps) {
     scene.background = new THREE.Color(p.bg);
     scene.fog = new THREE.Fog(p.bg, 300, 520);
   }, [scene, p.bg]);
-  useEffect(() => () => disposeCaches(), []);
 
   const sun = useMemo(() => {
     const l = new THREE.DirectionalLight('#fffaf0', p.isDark ? 1.0 : 1.55);
@@ -124,25 +128,15 @@ export function Scene(props: SceneProps) {
       <Foliage layout={layout} palette={p} />
 
       <SegmentStrips
-        segments={state.plan.logisSegments}
+        key={state.mode}
+        segments={state.plan.segments}
         color={p.tone.affected}
         width={1.1}
         y={0.12}
         opacity={0.85}
         state={state}
         pulse
-        targetOpacity={(s) => (s.mode === 'logis' ? 0.85 : 0)}
-        visibleCount={(s) => (s.trace.active ? s.plan.logisSegments.filter((g) => g.at <= s.trace.t).length : s.plan.logisSegments.length)}
-      />
-      <SegmentStrips
-        segments={state.plan.naiveSegments}
-        color={p.tone.affected}
-        width={1.1}
-        y={0.13}
-        opacity={0}
-        state={state}
-        pulse
-        targetOpacity={(s) => (s.mode === 'naive' && !s.trace.active ? 0.85 : 0)}
+        visibleCount={(s) => (s.trace.active ? s.plan.segments.filter((g) => g.at <= s.trace.t).length : s.plan.segments.length)}
       />
 
       {byKind.suppliers.map(({ node, placement }) => (
@@ -152,10 +146,11 @@ export function Scene(props: SceneProps) {
         <Plant key={node.id} node={node} placement={placement} state={state} selected={sel(node.id)} onSelect={onSelect} />
       ))}
       {byKind.warehouses.map(({ node, placement }) => (
-        <Warehouse key={node.id} node={node} placement={placement} state={state} selected={sel(node.id)} onSelect={onSelect} />
+        <Warehouse key={node.id} node={node} placement={placement} state={state} selected={sel(node.id)} onSelect={onSelect} onOpen={props.onOpenSite} />
       ))}
       <Stores stores={byKind.stores} state={state} selectedId={selection?.kind === 'node' ? selection.id : null} onSelect={onSelect} />
       <Vehicles runs={runs} state={state} onSelect={onSelect} />
+      <LabelDeclutter state={state} />
       <SelectionMarker selection={selection} data={data} layout={layout} runs={runs} state={state} />
     </>
   );

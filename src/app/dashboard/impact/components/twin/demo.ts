@@ -1,12 +1,28 @@
-import type { MapNode, MapShipment, NetworkMap, UnitSplit } from '@/lib/types/network';
+import type { MapNode, MapShipment, NetworkMap, StockLine, UnitSplit } from '@/lib/types/network';
 
 const split = (affected: number, uncertain: number, safe: number): UnitSplit => ({
   affected, uncertain, safe, naiveRecall: affected + uncertain + safe,
 });
 
+const line = (product: string, batch: string, units: number, status: string): StockLine => ({
+  label: `${product} · ${batch}`, product, batch, units, status, received: false,
+});
+
+function demoStock(u: UnitSplit): StockLine[] {
+  const safeA = Math.round(u.safe * 0.45);
+  const safeB = Math.round(u.safe * 0.35);
+  return [
+    line('Toned Milk 1L', 'B51', u.affected, 'affected'),
+    line('Toned Milk 1L', 'B56', u.uncertain, 'uncertain'),
+    line('Paneer 200g', 'B58', safeA, 'safe'),
+    line('Greek Yogurt 400g', 'B61', safeB, 'safe'),
+    line('Butter 100g', 'B63', u.safe - safeA - safeB, 'safe'),
+  ].filter((s) => s.units > 0);
+}
+
 const node = (id: string, kind: MapNode['kind'], name: string, location: string, units: UnitSplit, extra?: Partial<MapNode>): MapNode => ({
   id, kind, name, location, units, isSource: false,
-  stock: units.naiveRecall > 0 ? [{ label: 'Toned Milk 1L · B51', units: units.affected + units.uncertain, status: units.affected ? 'affected' : 'uncertain' }, { label: 'Paneer 200g · B58', units: units.safe, status: 'safe' }].filter((s) => s.units > 0) : [],
+  stock: units.naiveRecall > 0 ? demoStock(units) : [],
   ...extra,
 });
 
@@ -54,6 +70,7 @@ export function buildDemoNetwork(): NetworkMap {
       affected: 7776, uncertain: 199, safe: 21456, sold: 2343,
       logisUnits: 9658, naiveUnits: 23999, logisCost: 146696, naiveCost: 425982, costSaved: 279287, unitsSaved: 14341,
     },
+    hiddenStores: 0,
     isDemo: true,
   };
 }

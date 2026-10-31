@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { boxGeo, mat, planeGeo, sphereGeo } from './primitives';
-import { TS, tileX, tileZ, type CityLayout, type Segment } from './cityLayout';
+import { TS, type CityLayout, type Segment } from './cityLayout';
 import { ease, type TwinState } from './state';
 import type { Palette } from './palette';
 
@@ -37,13 +37,13 @@ export function Ground({ layout, palette }: { layout: CityLayout; palette: Palet
   const cropRef = useRef<THREE.InstancedMesh>(null);
 
   const blocks = useMemo(() => layout.blocks.map(([x, z]) => ({ x, y: 0.09, z })), [layout]);
-  const roads = useMemo(() => layout.roads.map((r) => ({ x: tileX(r.i), y: 0.03, z: tileZ(r.j) })), [layout]);
+  const roads = useMemo(() => layout.roads.map((r) => ({ x: r.x, y: 0.03, z: r.z })), [layout]);
   const dashes = useMemo(
-    () => layout.roads.filter((r) => r.kind !== 'x').map((r) => ({ x: tileX(r.i), y: 0.075, z: tileZ(r.j), ry: r.kind === 'v' ? Math.PI / 2 : 0 })),
+    () => layout.roads.filter((r) => r.kind !== 'x').map((r) => ({ x: r.x, y: 0.075, z: r.z, ry: r.kind === 'v' ? Math.PI / 2 : 0 })),
     [layout]
   );
   const crossings = useMemo(
-    () => layout.roads.filter((r) => r.kind === 'x').map((r) => ({ x: tileX(r.i), y: 0.07, z: tileZ(r.j) })),
+    () => layout.roads.filter((r) => r.kind === 'x').map((r) => ({ x: r.x, y: 0.07, z: r.z })),
     [layout]
   );
   const fields = useMemo(() => layout.fields.map(([x, z]) => ({ x, y: 0.2, z })), [layout]);

@@ -3,7 +3,7 @@
 import { useMemo, useState, type ReactNode, type RefObject } from 'react';
 import {
   Search, Play, Pause, RotateCcw, RotateCw, Plus, Minus, Crosshair, X, Truck, Warehouse, Factory, Store, Sprout,
-  ShieldAlert, PackageX, IndianRupee, Network, ZoomIn, ExternalLink, CheckCircle2,
+  ShieldAlert, PackageX, IndianRupee, Network, ZoomIn, ExternalLink, CheckCircle2, Maximize2, Minimize2,
 } from 'lucide-react';
 import { cn, formatCurrency, formatNumber } from '@/lib/utils';
 import type { MapNode, MapShipment, NetworkMap, ViewMode } from '@/lib/types/network';
@@ -24,6 +24,7 @@ interface OverlayProps {
   selection: Selection;
   onFocus: (s: Selection, close?: boolean) => void;
   onClear: () => void;
+  onOpenSite: () => void;
   held: Set<string>;
   onHold: (id: string) => void;
   onRotate: (dir: 1 | -1) => void;
@@ -31,6 +32,8 @@ interface OverlayProps {
   onReset: () => void;
   toast: ToastState | null;
   searchRef: RefObject<HTMLInputElement | null>;
+  fullscreen: boolean;
+  onFullscreen: () => void;
 }
 
 const TONE_CHIP: Record<Tone, string> = {
@@ -253,12 +256,13 @@ export function Overlay(props: OverlayProps) {
       return n.kind !== 'supplier' && (t === 'affected' || t === 'uncertain');
     }).length;
     const traceNodes = order.map((id) => byId.get(id)).filter((n): n is MapNode => !!n);
-    const totalAff = traceNodes.reduce((s, n) => s + (n.kind === 'plant' ? 0 : n.units.affected), 0) || 1;
-    const revAff = traceNodes.slice(0, revealed).reduce((s, n) => s + (n.kind === 'plant' ? 0 : n.units.affected), 0);
+    const share = (n: MapNode) => (n.kind === 'plant' ? 0 : mode === 'naive' ? n.units.naiveRecall : n.units.affected);
+    const totalAff = traceNodes.reduce((s, n) => s + share(n), 0) || 1;
+    const revAff = traceNodes.slice(0, revealed).reduce((s, n) => s + share(n), 0);
     const frac = tracing ? revAff / totalAff : 1;
     const stop = mode === 'naive' ? data.shipments.length : data.shipments.filter((s) => s.impact !== 'safe').length;
     return {
-      units: mode === 'naive' ? data.totals.naiveUnits : Math.round(data.totals.affected * frac),
+      units: Math.round((mode === 'naive' ? data.totals.naiveUnits : data.totals.affected) * frac),
       atRisk: tracing ? traceNodes.slice(0, revealed).filter((n) => n.kind !== 'supplier').length : atRisk,
       stop,
       held: data.shipments.filter((s) => held.has(s.id)).length,
@@ -306,7 +310,7 @@ export function Overlay(props: OverlayProps) {
             <button
               key={m}
               onClick={() => onMode(m)}
-              disabled={tracing}
+              disabled={trace === 'playing'}
               className={cn(
                 'h-7 whitespace-nowrap rounded-md px-2.5 text-[11px] font-semibold transition-colors disabled:opacity-50',
                 mode === m ? (m === 'logis' ? 'bg-dark-action text-dark-action-fg shadow-sm' : 'bg-critical text-white shadow-sm') : 'text-muted-foreground hover:text-foreground'
@@ -316,6 +320,15 @@ export function Overlay(props: OverlayProps) {
             </button>
           ))}
         </div>
+        <button
+          onClick={props.onOpenSite}
+          disabled={!data.nodes.some((n) => n.kind === 'warehouse')}
+          title="Open the 3D warehouse view (or double-click a warehouse)"
+          className="flex h-8 disabled:opacity-40 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-border bg-surface-2 px-2.5 text-[12px] font-semibold text-foreground hover:bg-surface"
+        >
+          <Warehouse className="h-3.5 w-3.5" />
+          <span className="hidden @3xl:inline">Warehouse view</span>
+        </button>
         <button
           onClick={onTrace}
           title="Trace the incident (Space)"
@@ -331,6 +344,7 @@ export function Overlay(props: OverlayProps) {
           <IconBtn onClick={() => props.onZoom(1.3)} title="Zoom in"><Plus className="h-4 w-4" /></IconBtn>
           <IconBtn onClick={props.onReset} title="Reset view"><Crosshair className="h-4 w-4" /></IconBtn>
         </div>
+        <IconBtn onClick={props.onFullscreen} title={props.fullscreen ? 'Exit fullscreen' : 'Fullscreen'}>{props.fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</IconBtn>
       </div>
 
       {/* KPI cards */}
@@ -376,7 +390,7 @@ export function Overlay(props: OverlayProps) {
         {selection && (
           <div className="flex gap-2 border-t border-border p-3">
             <button onClick={() => onFocus(selection, true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[12px] font-semibold text-foreground hover:bg-surface-2">
-              <ZoomIn className="h-3.5 w-3.5" /> {selNode?.kind === 'warehouse' ? 'Node view' : 'Center on map'}
+              <ZoomIn className="h-3.5 w-3.5" /> {selNode?.kind === 'warehouse' ? 'Open warehouse view' : 'Center on map'}
             </button>
             <a href={`/dashboard/incidents/${data.incident.id}`} className="flex items-center justify-center gap-1.5 rounded-full bg-dark-action px-3 py-1.5 text-[12px] font-semibold text-dark-action-fg hover:opacity-90">
               Incident <ExternalLink className="h-3 w-3" />

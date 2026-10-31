@@ -8,7 +8,7 @@ import { SegmentStrips } from './Roads';
 import type { TruckRun } from './Vehicles';
 import type { Selection as Sel, TwinState } from './state';
 
-function cornerBrackets(w: number, h: number, d: number): THREE.BufferGeometry {
+export function cornerBrackets(w: number, h: number, d: number): THREE.BufferGeometry {
   const e = Math.min(w, h, d) * 0.28 + 0.25;
   const pts: number[] = [];
   for (const x of [-w / 2, w / 2]) {
@@ -58,7 +58,7 @@ export function SelectionMarker({ selection, data, layout, runs, state }: Props)
     for (const e of links) {
       const r = routeBetween(layout, e.from, e.to);
       if (!r) continue;
-      segs.push(...centerSegments(r.tiles, r.start, r.end));
+      segs.push(...centerSegments(layout, r));
       const other = layout.placements.get(e.from === selection.id ? e.to : e.from);
       if (other) pins.push(other.door);
     }

@@ -11,8 +11,11 @@ export interface UnitSplit {
 
 export interface StockLine {
   label: string;
+  product: string;
+  batch: string;
   units: number;
   status: string;
+  received: boolean;
 }
 
 export interface MapNode {
@@ -54,5 +57,6 @@ export interface NetworkMap {
     costSaved: number;
     unitsSaved: number;
   };
+  hiddenStores: number;
   isDemo: boolean;
 }

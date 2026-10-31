@@ -102,7 +102,7 @@ export function Cyl({ r, h, color, position, rotation, rTop, cast = false }: Cyl
   );
 }
 
-function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
+export function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
@@ -114,10 +114,10 @@ function canvasTexture(w: number, h: number, draw: (g: CanvasRenderingContext2D)
   return t;
 }
 
-const SANS = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+export const SANS = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+export const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
-function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+export function roundRect(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   g.beginPath();
   g.moveTo(x + r, y);
   g.arcTo(x + w, y, x + w, y + h, r);
@@ -141,42 +141,54 @@ export interface LabelTex {
   aspect: number;
 }
 
-export function labelTexture(code: string, name: string, style: LabelStyle): LabelTex {
-  const key = `l|${code}|${name}|${style.bg}|${style.chip}`;
-  const H = 88;
+const LABEL_CSS_H = 24;
+
+// drawn at the screen's device-pixel height and sampled 1:1 (no mipmaps) so text stays sharp
+export function labelTexture(code: string, name: string, style: LabelStyle, pixelRatio = 1): LabelTex {
+  const pr = Math.max(1, Math.min(3, pixelRatio));
+  const H = Math.round(LABEL_CSS_H * pr * 2);
+  const f = H / 88;
+  const key = `l|${code}|${name}|${style.bg}|${style.chip}|${H}`;
+  const codeFont = `700 ${Math.round(33 * f)}px ${MONO}`;
+  const nameFont = `600 ${Math.round(37 * f)}px ${SANS}`;
   const measure = document.createElement('canvas').getContext('2d');
-  let codeW = 120;
-  let nameW = 200;
+  let codeW = 120 * f;
+  let nameW = 200 * f;
   if (measure) {
-    measure.font = `700 34px ${MONO}`;
-    codeW = measure.measureText(code).width + 28;
-    measure.font = `650 38px ${SANS}`;
+    measure.font = codeFont;
+    codeW = measure.measureText(code).width + 28 * f;
+    measure.font = nameFont;
     nameW = measure.measureText(name).width;
   }
-  const W = Math.ceil(12 + codeW + 16 + nameW + 22);
+  const W = Math.ceil(12 * f + codeW + 16 * f + nameW + 22 * f);
   const cached = TEXS.get(key);
   if (cached) return { texture: cached, aspect: W / H };
   const texture = canvasTexture(W, H, (g) => {
-    roundRect(g, 2, 2, W - 4, H - 4, 18);
+    roundRect(g, 2 * f, 2 * f, W - 4 * f, H - 4 * f, 18 * f);
     g.fillStyle = style.bg;
     g.fill();
-    g.lineWidth = 2;
+    g.lineWidth = 2 * f;
     g.strokeStyle = style.border;
     g.stroke();
-    roundRect(g, 12, 14, codeW, H - 28, 10);
+    roundRect(g, 12 * f, 14 * f, codeW, H - 28 * f, 10 * f);
     g.fillStyle = style.chip;
     g.fill();
-    g.fillStyle = style.chipFg;
-    g.font = `700 34px ${MONO}`;
     g.textBaseline = 'middle';
-    g.fillText(code, 26, H / 2 + 1);
+    g.fillStyle = style.chipFg;
+    g.font = codeFont;
+    g.fillText(code, 26 * f, H / 2 + f);
     g.fillStyle = style.fg;
-    g.font = `650 38px ${SANS}`;
-    g.fillText(name, 12 + codeW + 16, H / 2 + 2);
+    g.font = nameFont;
+    g.fillText(name, 12 * f + codeW + 16 * f, H / 2 + 2 * f);
   });
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
   TEXS.set(key, texture);
   return { texture, aspect: W / H };
 }
+
+export const LABEL_PX = LABEL_CSS_H;
 
 export function dotTexture(): THREE.CanvasTexture {
   const hit = TEXS.get('dot');

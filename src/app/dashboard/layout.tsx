@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, AlertTriangle, Map, ShieldCheck, Wrench,
-  BarChart3, Settings, Truck, Layers, Activity, BrainCircuit
+  BarChart3, Settings, Truck, Layers, Activity, BrainCircuit, Megaphone
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ModeToggle } from '@/components/mode-toggle';
@@ -24,6 +24,7 @@ const navGroups = [
     title: 'ACT',
     items: [
       { href: '/dashboard/response', icon: ShieldCheck, label: 'Response' },
+      { href: '/dashboard/action', icon: Megaphone, label: 'Action' },
       { href: '/dashboard/recovery', icon: Wrench, label: 'Recovery' },
       { href: '/dashboard/resources', icon: Truck, label: 'Resources' },
       { href: '/dashboard/scenarios', icon: Layers, label: 'Scenarios' },
